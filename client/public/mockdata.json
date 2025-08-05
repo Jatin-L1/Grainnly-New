@@ -1,0 +1,770 @@
+[
+  {
+    "name": "Jatin Sharma",
+    "aadhaar": "123456780012",
+    "rationCardNumber": "PB1234567890",
+    "category": "BPL",
+    "village": "Village Rampur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Riya Verma",
+    "aadhaar": "234567890123",
+    "rationCardNumber": "PB2345678901",
+    "category": "APL",
+    "village": "Village Chogawan",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Amit Kumar",
+    "aadhaar": "345678901234",
+    "rationCardNumber": "PB3456789012",
+    "category": "BPL",
+    "village": "Village Sundarpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Sneha Gupta",
+    "aadhaar": "456789012345",
+    "rationCardNumber": "PB4567890123",
+    "category": "APL",
+    "village": "Village Nandpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Rahul Singh",
+    "aadhaar": "567890123456",
+    "rationCardNumber": "PB5678901234",
+    "category": "BPL",
+    "village": "Village Kalyanpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Pooja Yadav",
+    "aadhaar": "678901234567",
+    "rationCardNumber": "PB6789012345",
+    "category": "APL",
+    "village": "Village Devigarh",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Vikram Patel",
+    "aadhaar": "789012345678",
+    "rationCardNumber": "PB7890123456",
+    "category": "BPL",
+    "village": "Village Amarpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Anjali Mehta",
+    "aadhaar": "890123456789",
+    "rationCardNumber": "PB8901234567",
+    "category": "APL",
+    "village": "Village Shivpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Suresh Reddy",
+    "aadhaar": "901234567890",
+    "rationCardNumber": "PB9012345678",
+    "category": "BPL",
+    "village": "Village Gauripur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Kavita Joshi",
+    "aadhaar": "012345678901",
+    "rationCardNumber": "PB0123456789",
+    "category": "APL",
+    "village": "Village Haripur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Manoj Thakur",
+    "aadhaar": "123456789012",
+    "rationCardNumber": "PB1234567891",
+    "category": "BPL",
+    "village": "Village Rajpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Neha Kapoor",
+    "aadhaar": "234567890124",
+    "rationCardNumber": "PB2345678902",
+    "category": "APL",
+    "village": "Village Manpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Arjun Desai",
+    "aadhaar": "345678901235",
+    "rationCardNumber": "PB3456789013",
+    "category": "BPL",
+    "village": "Village Balpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Shalini Rao",
+    "aadhaar": "456789012346",
+    "rationCardNumber": "PB4567890124",
+    "category": "APL",
+    "village": "Village Gangapur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Ravi Malhotra",
+    "aadhaar": "567890123457",
+    "rationCardNumber": "PB5678901235",
+    "category": "BPL",
+    "village": "Village Suryapur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Divya Nair",
+    "aadhaar": "678901234568",
+    "rationCardNumber": "PB6789012346",
+    "category": "APL",
+    "village": "Village Pratappur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Kiran Sharma",
+    "aadhaar": "789012345679",
+    "rationCardNumber": "PB7890123457",
+    "category": "BPL",
+    "village": "Village Vinodpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Asha Patel",
+    "aadhaar": "890123456780",
+    "rationCardNumber": "PB8901234568",
+    "category": "APL",
+    "village": "Village Keshavpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Nikhil Verma",
+    "aadhaar": "901234567891",
+    "rationCardNumber": "PB9012345679",
+    "category": "BPL",
+    "village": "Village Anantpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Priya Singh",
+    "aadhaar": "012345678902",
+    "rationCardNumber": "PB0123456790",
+    "category": "APL",
+    "village": "Village Madhupur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Rohan Gupta",
+    "aadhaar": "123456789013",
+    "rationCardNumber": "PB1234567892",
+    "category": "BPL",
+    "village": "Village Shivnagar",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Meena Reddy",
+    "aadhaar": "234567890125",
+    "rationCardNumber": "PB2345678903",
+    "category": "APL",
+    "village": "Village Gopalpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Sanjay Kumar",
+    "aadhaar": "345678901236",
+    "rationCardNumber": "PB3456789014",
+    "category": "BPL",
+    "village": "Village Ramnagar",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Lakshmi Nair",
+    "aadhaar": "456789012347",
+    "rationCardNumber": "PB4567890125",
+    "category": "APL",
+    "village": "Village Shantinagar",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Ajay Thakur",
+    "aadhaar": "567890123458",
+    "rationCardNumber": "PB5678901236",
+    "category": "BPL",
+    "village": "Village Premnagar",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Rekha Joshi",
+    "aadhaar": "678901234569",
+    "rationCardNumber": "PB6789012347",
+    "category": "APL",
+    "village": "Village Vikasnagar",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Vivek Rao",
+    "aadhaar": "789012345680",
+    "rationCardNumber": "PB7890123458",
+    "category": "BPL",
+    "village": "Village Arjunpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Sunita Desai",
+    "aadhaar": "890123456781",
+    "rationCardNumber": "PB8901234569",
+    "category": "APL",
+    "village": "Village Krishnapur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Anil Malhotra",
+    "aadhaar": "901234567892",
+    "rationCardNumber": "PB9012345680",
+    "category": "BPL",
+    "village": "Village Santoshpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Geeta Kapoor",
+    "aadhaar": "012345678903",
+    "rationCardNumber": "PB0123456791",
+    "category": "APL",
+    "village": "Village Anandpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Rakesh Singh",
+    "aadhaar": "123456789014",
+    "rationCardNumber": "PB1234567893",
+    "category": "BPL",
+    "village": "Village Jaynagar",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Sarita Yadav",
+    "aadhaar": "234567890126",
+    "rationCardNumber": "PB2345678904",
+    "category": "APL",
+    "village": "Village Neelpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Deepak Patel",
+    "aadhaar": "345678901237",
+    "rationCardNumber": "PB3456789015",
+    "category": "BPL",
+    "village": "Village Omnagar",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Komal Sharma",
+    "aadhaar": "456789012348",
+    "rationCardNumber": "PB4567890126",
+    "category": "APL",
+    "village": "Village Udaypur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Vinod Kumar",
+    "aadhaar": "567890123459",
+    "rationCardNumber": "PB5678901237",
+    "category": "BPL",
+    "village": "Village Vijaypur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Nisha Gupta",
+    "aadhaar": "678901234570",
+    "rationCardNumber": "PB6789012348",
+    "category": "APL",
+    "village": "Village Yashpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Harish Reddy",
+    "aadhaar": "789012345681",
+    "rationCardNumber": "PB7890123459",
+    "category": "BPL",
+    "village": "Village Zameenpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Suman Joshi",
+    "aadhaar": "890123456782",
+    "rationCardNumber": "PB8901234570",
+    "category": "APL",
+    "village": "Village Balrampur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Prakash Thakur",
+    "aadhaar": "901234567893",
+    "rationCardNumber": "PB9012345681",
+    "category": "BPL",
+    "village": "Village Chandpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Jyoti Nair",
+    "aadhaar": "012345678904",
+    "rationCardNumber": "PB0123456792",
+    "category": "APL",
+    "village": "Village Deeppur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Sachin Rao",
+    "aadhaar": "123456789015",
+    "rationCardNumber": "PB1234567894",
+    "category": "BPL",
+    "village": "Village Eknathpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Ritu Desai",
+    "aadhaar": "234567890127",
+    "rationCardNumber": "PB2345678905",
+    "category": "APL",
+    "village": "Village Firozpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Mohan Malhotra",
+    "aadhaar": "345678901238",
+    "rationCardNumber": "PB3456789016",
+    "category": "BPL",
+    "village": "Village Gyanpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Seema Kapoor",
+    "aadhaar": "456789012349",
+    "rationCardNumber": "PB4567890127",
+    "category": "APL",
+    "village": "Village Hiralalpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Ashok Singh",
+    "aadhaar": "567890123460",
+    "rationCardNumber": "PB5678901238",
+    "category": "BPL",
+    "village": "Village Indrapur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Bhavna Yadav",
+    "aadhaar": "678901234571",
+    "rationCardNumber": "PB6789012349",
+    "category": "APL",
+    "village": "Village Jagatpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Gaurav Patel",
+    "aadhaar": "789012345682",
+    "rationCardNumber": "PB7890123460",
+    "category": "BPL",
+    "village": "Village Kamapur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Tanu Sharma",
+    "aadhaar": "890123456783",
+    "rationCardNumber": "PB8901234571",
+    "category": "APL",
+    "village": "Village Lalitpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Yogesh Kumar",
+    "aadhaar": "901234567894",
+    "rationCardNumber": "PB9012345682",
+    "category": "BPL",
+    "village": "Village Mohanpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Shruti Gupta",
+    "aadhaar": "012345678905",
+    "rationCardNumber": "PB0123456793",
+    "category": "APL",
+    "village": "Village Narsinghpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Bharat Reddy",
+    "aadhaar": "123456789016",
+    "rationCardNumber": "PB1234567895",
+    "category": "BPL",
+    "village": "Village Omkarpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Uma Joshi",
+    "aadhaar": "234567890128",
+    "rationCardNumber": "PB2345678906",
+    "category": "APL",
+    "village": "Village Puranpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Chetan Thakur",
+    "aadhaar": "345678901239",
+    "rationCardNumber": "PB3456789017",
+    "category": "BPL",
+    "village": "Village Qutubpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Hema Nair",
+    "aadhaar": "456789012350",
+    "rationCardNumber": "PB4567890128",
+    "category": "APL",
+    "village": "Village Raghupur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Tarun Rao",
+    "aadhaar": "567890123461",
+    "rationCardNumber": "PB5678901239",
+    "category": "BPL",
+    "village": "Village Sumanpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Nidhi Desai",
+    "aadhaar": "678901234572",
+    "rationCardNumber": "PB6789012350",
+    "category": "APL",
+    "village": "Village Tulsipur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Kunal Malhotra",
+    "aadhaar": "789012345683",
+    "rationCardNumber": "PB7890123461",
+    "category": "BPL",
+    "village": "Village Umeshpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Radha Kapoor",
+    "aadhaar": "890123456784",
+    "rationCardNumber": "PB8901234572",
+    "category": "APL",
+    "village": "Village Vandanpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Mahesh Singh",
+    "aadhaar": "901234567895",
+    "rationCardNumber": "PB9012345683",
+    "category": "BPL",
+    "village": "Village Wazirpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Sonal Yadav",
+    "aadhaar": "012345678906",
+    "rationCardNumber": "PB0123456794",
+    "category": "APL",
+    "village": "Village Xavipur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Ramesh Patel",
+    "aadhaar": "123456789017",
+    "rationCardNumber": "PB1234567896",
+    "category": "BPL",
+    "village": "Village Yashwantpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Anita Sharma",
+    "aadhaar": "234567890129",
+    "rationCardNumber": "PB2345678907",
+    "category": "APL",
+    "village": "Village Zainpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Sandeep Kumar",
+    "aadhaar": "345678901240",
+    "rationCardNumber": "PB3456789018",
+    "category": "BPL",
+    "village": "Village Amarjeetpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Monika Gupta",
+    "aadhaar": "456789012351",
+    "rationCardNumber": "PB4567890129",
+    "category": "APL",
+    "village": "Village Bhawanipur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Vijay Reddy",
+    "aadhaar": "567890123462",
+    "rationCardNumber": "PB5678901240",
+    "category": "BPL",
+    "village": "Village Chamanpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Kusum Joshi",
+    "aadhaar": "678901234573",
+    "rationCardNumber": "PB6789012351",
+    "category": "APL",
+    "village": "Village Devpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Rohit Thakur",
+    "aadhaar": "789012345684",
+    "rationCardNumber": "PB7890123462",
+    "category": "BPL",
+    "village": "Village Ekbalpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Swati Nair",
+    "aadhaar": "890123456785",
+    "rationCardNumber": "PB8901234573",
+    "category": "APL",
+    "village": "Village Faridpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Alok Rao",
+    "aadhaar": "901234567896",
+    "rationCardNumber": "PB9012345684",
+    "category": "BPL",
+    "village": "Village Govindpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Preeti Desai",
+    "aadhaar": "012345678907",
+    "rationCardNumber": "PB0123456795",
+    "category": "APL",
+    "village": "Village Harshpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Dinesh Malhotra",
+    "aadhaar": "123456789018",
+    "rationCardNumber": "PB1234567897",
+    "category": "BPL",
+    "village": "Village Ishwarpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Vandana Kapoor",
+    "aadhaar": "234567890130",
+    "rationCardNumber": "PB2345678908",
+    "category": "APL",
+    "village": "Village Jaspur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Pankaj Singh",
+    "aadhaar": "345678901241",
+    "rationCardNumber": "PB3456789019",
+    "category": "BPL",
+    "village": "Village Kalapur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Reena Yadav",
+    "aadhaar": "456789012352",
+    "rationCardNumber": "PB4567890130",
+    "category": "APL",
+    "village": "Village Laxmipur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Naveen Patel",
+    "aadhaar": "567890123463",
+    "rationCardNumber": "PB5678901241",
+    "category": "BPL",
+    "village": "Village Manoharpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Shikha Sharma",
+    "aadhaar": "678901234574",
+    "rationCardNumber": "PB6789012352",
+    "category": "APL",
+    "village": "Village Nayanpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Akash Kumar",
+    "aadhaar": "789012345685",
+    "rationCardNumber": "PB7890123463",
+    "category": "BPL",
+    "village": "Village Omprakashpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Chhaya Gupta",
+    "aadhaar": "890123456786",
+    "rationCardNumber": "PB8901234574",
+    "category": "APL",
+    "village": "Village Pawanpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Siddharth Reddy",
+    "aadhaar": "901234567897",
+    "rationCardNumber": "PB9012345685",
+    "category": "BPL",
+    "village": "Village Qasimpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Manju Joshi",
+    "aadhaar": "012345678908",
+    "rationCardNumber": "PB0123456796",
+    "category": "APL",
+    "village": "Village Ratanpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Vinay Thakur",
+    "aadhaar": "123456789019",
+    "rationCardNumber": "PB1234567898",
+    "category": "BPL",
+    "village": "Village Sameerpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Kiran Nair",
+    "aadhaar": "234567890131",
+    "rationCardNumber": "PB2345678909",
+    "category": "APL",
+    "village": "Village Taranpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Aditya Rao",
+    "aadhaar": "345678901242",
+    "rationCardNumber": "PB3456789020",
+    "category": "BPL",
+    "village": "Village Ujjwalpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Suman Desai",
+    "aadhaar": "456789012353",
+    "rationCardNumber": "PB4567890131",
+    "category": "APL",
+    "village": "Village Vimalpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Naman Nayak",
+    "aadhaar": "567890169420",
+    "rationCardNumber": "PB5678969420",
+    "category": "BPL",
+    "village": "Panchkula",
+    "phoneNumber": "1231231230"
+  },
+  {
+    "name": "Pallavi Kapoor",
+    "aadhaar": "678901234575",
+    "rationCardNumber": "PB6789012353",
+    "category": "APL",
+    "village": "Village Xena",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Mukesh Singh",
+    "aadhaar": "789012345686",
+    "rationCardNumber": "PB7890123464",
+    "category": "BPL",
+    "village": "Village Yogipur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Sangeeta Yadav",
+    "aadhaar": "890123456787",
+    "rationCardNumber": "PB8901234575",
+    "category": "APL",
+    "village": "Village Zuberpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Kailash Patel",
+    "aadhaar": "901234567898",
+    "rationCardNumber": "PB9012345686",
+    "category": "BPL",
+    "village": "Village Akashpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Rupali Sharma",
+    "aadhaar": "012345678909",
+    "rationCardNumber": "PB0123456797",
+    "category": "APL",
+    "village": "Village Bheemapur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Santosh Kumar",
+    "aadhaar": "123456789020",
+    "rationCardNumber": "PB1234567899",
+    "category": "BPL",
+    "village": "Village Chetanpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Aarti Gupta",
+    "aadhaar": "234567890132",
+    "rationCardNumber": "PB2345678910",
+    "category": "APL",
+    "village": "Village Damanpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Pramod Reddy",
+    "aadhaar": "345678901243",
+    "rationCardNumber": "PB3456789021",
+    "category": "BPL",
+    "village": "Village Eshwarpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Lata Joshi",
+    "aadhaar": "456789012354",
+    "rationCardNumber": "PB4567890132",
+    "category": "APL",
+    "village": "Village Falgunpur",
+    "phoneNumber": "8284941698"
+  },
+  {
+    "name": "Girish Thakur",
+    "aadhaar": "567890123465",
+    "rationCardNumber": "PB5678901243",
+    "category": "BPL",
+    "village": "Village Gauravpur",
+    "phoneNumber": "8699000918"
+  },
+  {
+    "name": "Anu Nair",
+    "aadhaar": "678901234576",
+    "rationCardNumber": "PB6789012354",
+    "category": "APL",
+    "village": "Village Hariprasad",
+    "phoneNumber": "8284941698"
+  }
+]

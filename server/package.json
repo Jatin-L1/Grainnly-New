@@ -1,0 +1,47 @@
+{
+  "name": "Grainlyyy-server",
+  "version": "1.0.0",
+  "description": "Grainlyyy's backend API server – empowering blockchain-based ration distribution with GPS-verified delivery validation, smart contract interactions, and transparent public tracking.",
+  "keywords": [
+    "Grainlyyy",
+    "blockchain",
+    "express",
+    "nodejs",
+    "chainlink",
+    "gps-verification",
+    "smart-contracts",
+    "ration-tracking"
+  ],
+  "homepage": "https://github.com/Namann-14/Grainlyyy#readme",
+  "bugs": {
+    "url": "https://github.com/Namann-14/Grainlyyy/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Namann-14/Grainlyyy.git"
+  },
+  "license": "ISC",
+  "author": "Naman Nayak",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node server.js",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "bcryptjs": "^3.0.2",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.14.0",
+    "morgan": "^1.10.0"
+  }
+}
