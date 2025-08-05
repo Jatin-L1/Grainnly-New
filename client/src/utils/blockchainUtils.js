@@ -2,7 +2,7 @@ import { ethers } from 'ethers';
 import contractABI from '../../abis/DiamondMergedABI.json';
 
 // Contract configuration - using environment variables
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0xBD331E9eCD73f554768ea919Ae542BD1675e7E24';
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0x3329CA690f619bae73b9f36eb43839892D20045f';
 const POLYGON_RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || 'https://polygon-amoy.g.alchemy.com/v2/xMcrrdg5q8Pdtqa6itPOK';
 
 // Get contract instance
@@ -374,10 +374,11 @@ export class AdminContractAPI {
 
   async getAllShopkeepers() {
     try {
-      const result = await this.readOnlyContract.getAllShopkeepers();
+      // Use getShopkeeperDashboard() instead of getAllShopkeepers()
+      const result = await this.readOnlyContract.getShopkeeperDashboard();
       return { success: true, data: result };
     } catch (error) {
-      console.error('Error getting all shopkeepers:', error);
+      console.error('Error getting shopkeeper dashboard:', error);
       return { success: false, error: error.message };
     }
   }

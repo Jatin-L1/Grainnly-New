@@ -1,0 +1,209 @@
+[
+  {
+    "inputs": [{"name": "tokenId", "type": "uint256"}],
+    "name": "tokenExists",
+    "outputs": [{"name": "", "type": "bool"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"name": "tokenId", "type": "uint256"}],
+    "name": "isTokenExpired",
+    "outputs": [{"name": "", "type": "bool"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"name": "tokenId", "type": "uint256"}],
+    "name": "isTokenClaimed",
+    "outputs": [{"name": "", "type": "bool"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"name": "tokenId", "type": "uint256"}],
+    "name": "getTokenData",
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {"name": "tokenId", "type": "uint256"},
+          {"name": "aadhaar", "type": "uint256"},
+          {"name": "assignedShopkeeper", "type": "address"},
+          {"name": "rationAmount", "type": "uint256"},
+          {"name": "issuedTime", "type": "uint256"},
+          {"name": "expiryTime", "type": "uint256"},
+          {"name": "claimTime", "type": "uint256"},
+          {"name": "isClaimed", "type": "bool"},
+          {"name": "isExpired", "type": "bool"},
+          {"name": "category", "type": "string"}
+        ]
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"name": "tokenId", "type": "uint256"}],
+    "name": "getTokenStatus",
+    "outputs": [{"name": "", "type": "uint8"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"name": "aadhaar", "type": "uint256"}],
+    "name": "getTokensByAadhaar",
+    "outputs": [{"name": "", "type": "uint256[]"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"name": "aadhaar", "type": "uint256"}],
+    "name": "getUnclaimedTokensByAadhaar",
+    "outputs": [{"name": "", "type": "uint256[]"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"name": "aadhaar", "type": "uint256"}],
+    "name": "getTotalTokensByAadhaar",
+    "outputs": [{"name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getAllTokens",
+    "outputs": [{"name": "", "type": "uint256[]"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getTokensExpiringSoon",
+    "outputs": [{"name": "", "type": "uint256[]"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getExpiredTokens",
+    "outputs": [{"name": "", "type": "uint256[]"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"name": "aadhaar", "type": "uint256"},
+      {"name": "month", "type": "uint256"},
+      {"name": "year", "type": "uint256"}
+    ],
+    "name": "hasTokensForMonth",
+    "outputs": [{"name": "", "type": "bool"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"name": "tokenId", "type": "uint256"}],
+    "name": "markAsClaimed",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"name": "tokenId", "type": "uint256"}],
+    "name": "markAsExpired",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"name": "aadhaar", "type": "uint256"},
+      {"name": "shopkeeper", "type": "address"},
+      {"name": "rationAmount", "type": "uint256"},
+      {"name": "category", "type": "string"}
+    ],
+    "name": "mintTokenForAadhaar",
+    "outputs": [{"name": "", "type": "uint256"}],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"name": "rationSystemContract", "type": "address"}],
+    "name": "setMinter",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "name",
+    "outputs": [{"name": "", "type": "string"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "symbol",
+    "outputs": [{"name": "", "type": "string"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "rationSystemContract",
+    "outputs": [{"name": "", "type": "address"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "name": "tokenId", "type": "uint256"},
+      {"indexed": true, "name": "aadhaar", "type": "uint256"},
+      {"indexed": false, "name": "rationAmount", "type": "uint256"},
+      {"indexed": false, "name": "expiryTime", "type": "uint256"}
+    ],
+    "name": "TokenMinted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "name": "tokenId", "type": "uint256"},
+      {"indexed": true, "name": "aadhaar", "type": "uint256"},
+      {"indexed": false, "name": "claimedTime", "type": "uint256"}
+    ],
+    "name": "TokenClaimed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "name": "tokenId", "type": "uint256"},
+      {"indexed": true, "name": "aadhaar", "type": "uint256"}
+    ],
+    "name": "TokenExpired",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "name": "oldContract", "type": "address"},
+      {"indexed": true, "name": "newContract", "type": "address"}
+    ],
+    "name": "RationSystemContractSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "name": "previousOwner", "type": "address"},
+      {"indexed": true, "name": "newOwner", "type": "address"}
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
+  }
+]

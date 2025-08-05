@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 
 // Use the correct Diamond Proxy address
-const DIAMOND_PROXY_ADDRESS = "0xBD331E9eCD73f554768ea919Ae542BD1675e7E24";
+const DIAMOND_PROXY_ADDRESS = "0x3329CA690f619bae73b9f36eb43839892D20045f";
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL;
 
 export default function ShopkeeperManagement() {
@@ -67,13 +67,25 @@ export default function ShopkeeperManagement() {
       if (data.success && data.data) {
         setShopkeepers(data.data);
         console.log("✅ Successfully loaded", data.data.length, "shopkeepers");
+        console.log("📊 Data source:", data.dataSource);
+        
+        if (data.dataSource === 'blockchain') {
+          setSuccess(`🎉 Successfully loaded ${data.data.length} shopkeepers from blockchain!`);
+        } else if (data.dataSource === 'database') {
+          setSuccess(`📦 Loaded ${data.data.length} shopkeepers from database (blockchain unavailable)`);
+        } else {
+          setSuccess(`✅ Loaded ${data.data.length} shopkeepers`);
+        }
       } else {
         setShopkeepers([]);
+        console.log("⚠️ No shopkeepers found");
+        setError("No shopkeepers found. Register some shopkeepers first.");
       }
       
     } catch (error) {
-      console.error('❌ Error fetching shopkeepers:', error);
-      setError('Failed to fetch shopkeepers: ' + error.message);
+      console.error("❌ Error fetching shopkeepers:", error);
+      setError(`Failed to fetch shopkeepers: ${error.message}`);
+      setShopkeepers([]);
     } finally {
       setLoading(false);
       setRefreshing(false);

@@ -3,7 +3,7 @@ import contractABI from '../../abis/DiamondMergedABI.json';
 
 export const getContract = (signer) => {
   // Use the Diamond Proxy contract address from environment variables
-  const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0xBD331E9eCD73f554768ea919Ae542BD1675e7E24';
+  const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0x3329CA690f619bae73b9f36eb43839892D20045f';
   
   
   try {

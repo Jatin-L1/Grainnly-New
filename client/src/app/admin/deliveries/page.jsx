@@ -73,20 +73,29 @@ export default function DeliverySignupRequests() {
     }
   };
 
-  // Fetch shopkeepers from Diamond Proxy using merged ABI
+  // Fetch shopkeepers from API instead of blockchain directly
   const fetchShopkeepersFromBlockchain = async () => {
     try {
-      const provider = new ethers.JsonRpcProvider(RPC_URL);
-      const contract = new ethers.Contract(
-        DIAMOND_PROXY_ADDRESS,
-        DiamondMergedABI,
-        provider
-      );
-      const addresses = await contract.getAllShopkeepers();
-      setShopkeepers(addresses.map(addr => ({ walletAddress: addr })));
+      console.log("🏪 Fetching shopkeepers from API...");
+      
+      const response = await fetch('/api/admin?endpoint=get-shopkeepers');
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        const shopkeepers = data.data.map(shopkeeper => ({
+          walletAddress: shopkeeper.shopkeeperAddress,
+          name: shopkeeper.name || 'Unknown Shop',
+          area: shopkeeper.area || 'Unknown Area'
+        }));
+        setShopkeepers(shopkeepers);
+        console.log(`✅ Found ${shopkeepers.length} shopkeepers`);
+      } else {
+        setShopkeepers([]);
+        console.log("⚠️ No shopkeepers found");
+      }
     } catch (err) {
       setShopkeepers([]);
-      console.error("Error fetching shopkeepers from blockchain:", err);
+      console.error("❌ Error fetching shopkeepers:", err);
     }
   };
 

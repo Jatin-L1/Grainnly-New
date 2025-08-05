@@ -3,6 +3,7 @@ import { ethers } from 'ethers';
 import twilio from 'twilio';
 import dbConnect from '@/lib/mongodb';
 import DeliverySignupRequest from '@/models/DeliverySignupRequest';
+import ShopkeeperSignupRequest from '@/models/ShopkeeperSignupRequest';
 import DiamondMergedABI from "../../../../abis/DiamondMergedABI.json";
 
 // Initialize Twilio
@@ -18,31 +19,31 @@ const TOKEN_OPS_ABI = [
   "function generateMonthlyTokensForAll() external"
 ];
 
-// Dashboard ABI - Only functions that are confirmed to work
+// Dashboard ABI - ALL functions now available in your deployed contract
 const DASHBOARD_ABI = [
-  "function getConsumersPaginated(uint256 offset, uint256 limit) view returns (tuple(uint256 aadhaar, string name, string mobile, string category, uint256 registrationTime, address assignedShopkeeper, uint256 totalTokensReceived, uint256 totalTokensClaimed, uint256 lastTokenIssuedTime, bool isActive)[] consumerList, uint256 total)",
-  "function getConsumersByCategory(string category) view returns (tuple(uint256 aadhaar, string name, string mobile, string category, uint256 registrationTime, address assignedShopkeeper, uint256 totalTokensReceived, uint256 totalTokensClaimed, uint256 lastTokenIssuedTime, bool isActive)[])",
-  "function searchConsumersByName(string nameQuery) view returns (tuple(uint256 aadhaar, string name, string mobile, string category, uint256 registrationTime, address assignedShopkeeper, uint256 totalTokensReceived, uint256 totalTokensClaimed, uint256 lastTokenIssuedTime, bool isActive)[])",
-  "function getConsumerByAadhaar(uint256 aadhaar) view returns (tuple(uint256 aadhaar, string name, string mobile, string category, uint256 registrationTime, address assignedShopkeeper, uint256 totalTokensReceived, uint256 totalTokensClaimed, uint256 lastTokenIssuedTime, bool isActive))",
-  "function getShopkeeperInfo(address shopkeeper) view returns (tuple(address shopkeeperAddress, string name, string area, uint256 registrationTime, uint256 totalConsumersAssigned, uint256 totalTokensIssued, uint256 totalDeliveries, bool isActive))",
-  "function getUnclaimedTokensByAadhaar(uint256 aadhaar) view returns (uint256[])",
   "function getAdminDashboard() view returns (tuple(uint256 totalConsumers, uint256 totalShopkeepers, uint256 totalDeliveryAgents, uint256 totalTokensIssued, uint256 totalTokensClaimed, uint256 totalTokensExpired, uint256 pendingTokens, uint256 currentMonth, uint256 currentYear, uint256 lastUpdateTime))",
-  "function getRecentActivityLogs(uint256 limit) view returns (tuple(uint256 timestamp, address actor, string action, uint256 aadhaar, uint256 tokenId, string details)[])",
-  "function getSystemHealthReport() view returns (uint256 totalRegisteredConsumers, uint256 activeConsumers, uint256 inactiveConsumers, uint256 consumersWithCurrentMonthToken, uint256 consumersWithoutCurrentMonthToken, uint256 totalShopkeepers, uint256 totalDeliveryAgents, uint256 systemEfficiencyScore)",
-  "function getAreaWiseStats() view returns (string[] areas, uint256[] shopkeeperCounts, uint256[] consumerCounts, uint256[] activeConsumers)",
-  "function getCategoryWiseStats() view returns (string[] categories, uint256[] consumerCounts, uint256[] rationAmounts)",
-  "function getConsumersNeedingEmergencyHelp() view returns (uint256[])",
-  "function getAllShopkeepers() view returns (address[])",
   "function getShopkeeperInfo(address shopkeeper) view returns (tuple(address shopkeeperAddress, string name, string area, uint256 registrationTime, uint256 totalConsumersAssigned, uint256 totalTokensIssued, uint256 totalDeliveries, bool isActive))",
   "function getConsumersByShopkeeper(address shopkeeper) view returns (tuple(uint256 aadhaar, string name, string mobile, string category, uint256 registrationTime, address assignedShopkeeper, uint256 totalTokensReceived, uint256 totalTokensClaimed, uint256 lastTokenIssuedTime, bool isActive)[])",
-  "function getDeliveryAgents() view returns (tuple(address agentAddress, string name, string mobile, address assignedShopkeeper, uint256 totalDeliveries, uint256 registrationTime, bool isActive)[])"
+  "function getTotalShopkeepers() view returns (uint256)",
+  "function getTotalDeliveryAgents() view returns (uint256)",
+  "function getTotalConsumers() view returns (uint256)",
+  "function getCategoryWiseStats() view returns (string[] categories, uint256[] consumerCounts, uint256[] rationAmounts)",
+  // NEW FUNCTIONS NOW AVAILABLE:
+  "function getAllShopkeepers() view returns (address[])",
+  "function getAllDeliveryAgents() view returns (address[])",
+  "function getAreaWiseStats() view returns (string[] areas, uint256[] consumerCounts, uint256[] activeShopkeepers, uint256[] tokenDistributed)",
+  "function getConsumersPaginated(uint256 offset, uint256 limit) view returns (tuple(uint256 aadhaar, string name, string mobile, string category, uint256 registrationTime, address assignedShopkeeper, uint256 totalTokensReceived, uint256 totalTokensClaimed, uint256 lastTokenIssuedTime, bool isActive)[] consumerList, uint256 total)",
+  "function searchConsumersByName(string name) view returns (tuple(uint256 aadhaar, string name, string mobile, string category, uint256 registrationTime, address assignedShopkeeper, uint256 totalTokensReceived, uint256 totalTokensClaimed, uint256 lastTokenIssuedTime, bool isActive)[])",
+  "function getConsumersNeedingEmergencyHelp() view returns (uint256[])",
+  "function getShopkeeperDashboard(address shopkeeper) view returns (tuple(address shopkeeperAddress, string name, string area, uint256 registrationTime, uint256 totalConsumersAssigned, uint256 totalTokensIssued, uint256 totalDeliveries, bool isActive))",
+  "function getDeliveryAgentDashboard(address agent) view returns (tuple(address agentAddress, string name, string mobile, address assignedShopkeeper, uint256 totalDeliveries, uint256 registrationTime, bool isActive))"
 ];
 
 // Use public RPC
 const provider = new ethers.JsonRpcProvider("https://rpc-amoy.polygon.technology");
 
 // Contract address
-const CONTRACT_ADDRESS = "0xBD331E9eCD73f554768ea919Ae542BD1675e7E24";
+const CONTRACT_ADDRESS = "0x3329CA690f619bae73b9f36eb43839892D20045f";
 
 // Initialize contracts
 let adminWallet, dashboardContract, tokenOpsContract, diamondContract;
@@ -820,156 +821,165 @@ async function handleConsumers(searchParams) {
 
 async function handleShopkeepers() {
   try {
-    console.log('Fetching shopkeepers from blockchain...');
+    console.log('🏪 Fetching shopkeepers from blockchain...');
     
-    if (!dashboardContract) {
-      console.error('Dashboard contract not initialized');
-      throw new Error('Dashboard contract not initialized');
-    }
+    // Try blockchain first with the new getAllShopkeepers function
+    const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL);
+    const contract = new ethers.Contract(
+      process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
+      DASHBOARD_ABI,
+      provider
+    );
 
-    // First, try getAllShopkeepers
     try {
-      const shopkeeperAddresses = await dashboardContract.getAllShopkeepers();
-      console.log('Shopkeeper addresses from blockchain:', shopkeeperAddresses);
+      // Get all shopkeeper addresses using the new function
+      const shopkeeperAddresses = await contract.getAllShopkeepers();
+      console.log(`✅ Found ${shopkeeperAddresses.length} shopkeepers on blockchain`);
       
-      if (!shopkeeperAddresses || shopkeeperAddresses.length === 0) {
-        return NextResponse.json({
-          success: true,
-          data: [],
-          message: 'No shopkeepers registered on blockchain'
-        });
-      }
-
       // Get detailed info for each shopkeeper
-      const shopkeepersPromises = shopkeeperAddresses.map(async (address) => {
+      const shopkeepers = [];
+      for (const address of shopkeeperAddresses) {
         try {
-          const info = await dashboardContract.getShopkeeperInfo(address);
-          return {
+          const info = await contract.getShopkeeperInfo(address);
+          shopkeepers.push({
             shopkeeperAddress: info.shopkeeperAddress,
             name: info.name,
             area: info.area,
+            mobile: 'Available via blockchain',
             registrationTime: Number(info.registrationTime),
             totalConsumersAssigned: Number(info.totalConsumersAssigned),
             totalTokensIssued: Number(info.totalTokensIssued),
             totalDeliveries: Number(info.totalDeliveries),
-            isActive: info.isActive
-          };
+            isActive: info.isActive,
+            dataSource: 'blockchain'
+          });
         } catch (error) {
-          console.error(`Error fetching info for shopkeeper ${address}:`, error);
-          return {
-            shopkeeperAddress: address,
-            name: 'Unknown',
-            area: 'Unknown',
-            registrationTime: 0,
-            totalConsumersAssigned: 0,
-            totalTokensIssued: 0,
-            totalDeliveries: 0,
-            isActive: false
-          };
+          console.error(`Error getting info for shopkeeper ${address}:`, error);
         }
-      });
-
-      const shopkeepers = await Promise.all(shopkeepersPromises);
-      console.log('Processed shopkeeper data:', shopkeepers);
+      }
+      
+      console.log(`🎉 Successfully fetched ${shopkeepers.length} shopkeepers from blockchain!`);
       
       return NextResponse.json({
         success: true,
         data: shopkeepers,
         dataSource: 'blockchain',
-        contractAddress: CONTRACT_ADDRESS,
-        validation: {
-          totalFound: shopkeepers.length,
-          activeCount: shopkeepers.filter(s => s.isActive).length,
-          validAddresses: shopkeepers.filter(s => s.shopkeeperAddress && s.shopkeeperAddress !== '0x0000000000000000000000000000000000000000').length
+        message: `Found ${shopkeepers.length} shopkeepers from blockchain`,
+        info: {
+          totalOnBlockchain: shopkeeperAddresses.length,
+          successfullyFetched: shopkeepers.length,
+          note: 'Data fetched directly from blockchain using getAllShopkeepers()'
         }
       });
-    } catch (getAllError) {
-      console.log('getAllShopkeepers failed, trying fallback approach:', getAllError.message);
       
-      // Fallback: Check dashboard for total count
-      try {
-        const dashboardData = await dashboardContract.getAdminDashboard();
-        const totalShopkeepers = Number(dashboardData.totalShopkeepers);
-        
-        if (totalShopkeepers > 0) {
-          return NextResponse.json({
-            success: true,
-            data: [],
-            warning: `📊 Blockchain reports ${totalShopkeepers} shopkeepers registered, but the getAllShopkeepers() function is not available in the deployed Diamond contract.`,
-            info: {
-              totalShopkeepers,
-              contractIssue: 'getAllShopkeepers function not cut/registered in Diamond',
-              explanation: 'This is a Diamond contract configuration issue. The function exists in your contract code but was not properly registered during deployment.',
-              solutions: [
-                'Redeploy the Diamond contract with proper function cuts',
-                'Or register new shopkeepers using the form below',
-                'Or contact the contract admin to fix the Diamond configuration'
-              ],
-              technicalDetails: {
-                functionSelector: '0xc1d63e00',
-                expectedFacetAddress: 'Should not be 0x000...000',
-                currentStatus: 'Function selector not mapped to any facet'
-              }
-            },
-            dataSource: 'blockchain-dashboard-only',
-            contractAddress: CONTRACT_ADDRESS
-          });
-        } else {
-          return NextResponse.json({
-            success: true,
-            data: [],
-            message: 'No shopkeepers registered on blockchain',
-            dataSource: 'blockchain-dashboard',
-            contractAddress: CONTRACT_ADDRESS
-          });
+    } catch (blockchainError) {
+      console.log('❌ getAllShopkeepers failed:', blockchainError.message);
+      
+      // Fallback to database
+      await dbConnect();
+      console.log('📦 Falling back to database...');
+      
+      const shopkeeperRequests = await ShopkeeperSignupRequest.find({ status: 'approved' })
+        .sort({ createdAt: -1 })
+        .lean();
+      
+      const shopkeepers = shopkeeperRequests.map(request => ({
+        shopkeeperAddress: request.walletAddress,
+        name: request.name || 'Unknown',
+        area: request.area || 'Unknown',
+        mobile: request.mobile || 'Not provided',
+        registrationTime: Math.floor(new Date(request.updatedAt).getTime() / 1000),
+        totalConsumersAssigned: 0,
+        totalTokensIssued: 0,
+        totalDeliveries: 0,
+        isActive: true,
+        dataSource: 'database'
+      }));
+
+      return NextResponse.json({
+        success: true,
+        data: shopkeepers,
+        dataSource: 'database',
+        message: `Found ${shopkeepers.length} shopkeepers from database`,
+        blockchainError: blockchainError.message,
+        info: {
+          note: 'Blockchain function failed, using database fallback',
+          totalInDatabase: shopkeepers.length
         }
-      } catch (dashboardError) {
-        throw dashboardError;
-      }
+      });
     }
+    
   } catch (error) {
     console.error('Shopkeepers fetch error:', error);
-    console.error('Error details:', {
-      name: error.name,
-      message: error.message,
-      code: error.code
-    });
     
     return NextResponse.json({
-      success: true,
+      success: false,
       data: [],
-      warning: `No shopkeeper data available - blockchain connection issue: ${error.message}`,
-      error: true
+      error: `Failed to fetch shopkeepers: ${error.message}`
     });
   }
 }
 
-// SINGLE handleDeliveryAgents function - Enhanced version that combines blockchain and database data
+// SINGLE handleDeliveryAgents function - Now using getAllDeliveryAgents from blockchain
 async function handleDeliveryAgents() {
   try {
-    await dbConnect();
+    console.log('🚚 Fetching delivery agents from blockchain...');
     
-    // Get approved delivery partners from MongoDB
-    const approvedPartners = await DeliverySignupRequest.find({ 
-      status: 'approved' 
-    }).select('name phone walletAddress vehicleType licenseNumber reviewedAt blockchainTxHash');
+    // Try blockchain first with the new getAllDeliveryAgents function
+    const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL);
+    const contract = new ethers.Contract(
+      process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
+      DASHBOARD_ABI,
+      provider
+    );
 
     let blockchainAgents = [];
     
-    // Try to get data from multiple contract sources
     try {
-      // Method 1: Try the dashboard contract getDeliveryAgents
-      try {
-        blockchainAgents = await dashboardContract.getDeliveryAgents();
-        console.log('✅ Successfully fetched from dashboardContract.getDeliveryAgents()');
-      } catch (dashError) {
-        console.log('⚠️ Dashboard contract method failed:', dashError.message);
-        // Just log the error and continue with database data
-        blockchainAgents = [];
+      // Get all delivery agent addresses using the new function
+      const agentAddresses = await contract.getAllDeliveryAgents();
+      console.log(`✅ Found ${agentAddresses.length} delivery agents on blockchain`);
+      
+      // Get detailed info for each agent
+      for (const address of agentAddresses) {
+        try {
+          const agentInfo = await contract.getDeliveryAgentDashboard(address);
+          blockchainAgents.push({
+            agentAddress: agentInfo.agentAddress,
+            name: agentInfo.name,
+            mobile: agentInfo.mobile,
+            assignedShopkeeper: agentInfo.assignedShopkeeper,
+            totalDeliveries: Number(agentInfo.totalDeliveries),
+            registrationTime: Number(agentInfo.registrationTime),
+            isActive: agentInfo.isActive,
+            dataSource: 'blockchain'
+          });
+        } catch (infoError) {
+          console.log(`⚠️ Could not get details for agent ${address}, using basic info`);
+          blockchainAgents.push({
+            agentAddress: address,
+            name: 'Unknown Agent',
+            mobile: 'Not available',
+            assignedShopkeeper: '0x0000000000000000000000000000000000000000',
+            totalDeliveries: 0,
+            registrationTime: 0,
+            isActive: true,
+            dataSource: 'blockchain-limited'
+          });
+        }
       }
-    } catch (error) {
-      console.error('All blockchain methods failed:', error);
+      
+      console.log(`🎉 Successfully fetched ${blockchainAgents.length} agents from blockchain!`);
+      
+    } catch (blockchainError) {
+      console.log('❌ getAllDeliveryAgents failed:', blockchainError.message);
     }
+
+    // Also get approved agents from database for comparison
+    await dbConnect();
+    const approvedPartners = await DeliverySignupRequest.find({ 
+      status: 'approved' 
+    }).select('name phone walletAddress vehicleType licenseNumber reviewedAt blockchainTxHash');
 
     // Combine data from both sources, prioritizing blockchain data
     const combinedAgents = [];
@@ -977,16 +987,7 @@ async function handleDeliveryAgents() {
 
     // Add blockchain agents first
     for (const agent of blockchainAgents) {
-      combinedAgents.push({
-        agentAddress: agent.agentAddress,
-        name: agent.name,
-        mobile: agent.mobile,
-        assignedShopkeeper: agent.assignedShopkeeper,
-        totalDeliveries: Number(agent.totalDeliveries || 0),
-        registrationTime: Number(agent.registrationTime || 0),
-        isActive: agent.isActive,
-        source: 'blockchain'
-      });
+      combinedAgents.push(agent);
       processedAddresses.add(agent.agentAddress.toLowerCase());
     }
 
@@ -1001,7 +1002,7 @@ async function handleDeliveryAgents() {
           totalDeliveries: 0,
           registrationTime: Math.floor(new Date(partner.reviewedAt).getTime() / 1000),
           isActive: true,
-          source: 'database',
+          dataSource: 'database',
           txHash: partner.blockchainTxHash
         });
       }
@@ -1016,14 +1017,15 @@ async function handleDeliveryAgents() {
         totalAgents: combinedAgents.length,
         blockchainAgents: blockchainAgents.length,
         databaseAgents: approvedPartners.length,
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
+        note: blockchainAgents.length > 0 ? 'Successfully using blockchain data' : 'Using database fallback'
       }
     });
 
   } catch (error) {
     console.error('❌ Delivery agents fetch error:', error);
     
-    // Fallback: Return only database data if blockchain fails
+    // Final fallback: Return only database data if everything fails
     try {
       await dbConnect();
       const fallbackPartners = await DeliverySignupRequest.find({ 
@@ -1040,7 +1042,7 @@ async function handleDeliveryAgents() {
           totalDeliveries: 0,
           registrationTime: Math.floor(new Date(partner.reviewedAt).getTime() / 1000),
           isActive: true,
-          source: 'database_fallback',
+          dataSource: 'database_fallback',
           txHash: partner.blockchainTxHash
         })),
         warning: 'Using database fallback due to blockchain connection issues'
@@ -1057,19 +1059,30 @@ async function handleDeliveryAgents() {
 
 async function handleAreaStats() {
   try {
-    const areaStats = await dashboardContract.getAreaWiseStats();
+    console.log('📍 Fetching area statistics from blockchain...');
+    
+    const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL);
+    const contract = new ethers.Contract(
+      process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
+      DASHBOARD_ABI,
+      provider
+    );
+    
+    const areaStats = await contract.getAreaWiseStats();
     
     const areas = areaStats.areas;
-    const shopkeepers = areaStats.shopkeeperCounts;
-    const consumers = areaStats.consumerCounts;
-    const activeConsumers = areaStats.activeConsumers;
+    const consumerCounts = areaStats.consumerCounts;
+    const activeShopkeepers = areaStats.activeShopkeepers;
+    const tokenDistributed = areaStats.tokenDistributed;
 
     const formattedStats = areas.map((area, index) => ({
       area,
-      shopkeepers: Number(shopkeepers[index]),
-      consumers: Number(consumers[index]),
-      activeConsumers: Number(activeConsumers[index])
+      consumers: Number(consumerCounts[index]),
+      shopkeepers: Number(activeShopkeepers[index]),
+      tokensDistributed: Number(tokenDistributed[index])
     }));
+
+    console.log(`✅ Successfully fetched area stats for ${formattedStats.length} areas`);
 
     return NextResponse.json({
       success: true,
@@ -1080,7 +1093,8 @@ async function handleAreaStats() {
     return NextResponse.json({
       success: true,
       data: [],
-      warning: 'No area statistics available - blockchain connection issue'
+      warning: 'No area statistics available - blockchain connection issue',
+      error: error.message
     });
   }
 }
@@ -1115,18 +1129,29 @@ async function handleCategoryStats() {
 
 async function handleEmergencyCases() {
   try {
-    const emergencyAadhaars = await dashboardContract.getConsumersNeedingEmergencyHelp();
+    console.log('🚨 Fetching emergency cases from blockchain...');
+    
+    const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL);
+    const contract = new ethers.Contract(
+      process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
+      DASHBOARD_ABI,
+      provider
+    );
+    
+    const emergencyAadhaars = await contract.getConsumersNeedingEmergencyHelp();
     
     const emergencyConsumers = [];
     
     for (const aadhaar of emergencyAadhaars) {
       try {
-        const consumer = await dashboardContract.getConsumerByAadhaar(aadhaar);
+        const consumer = await contract.getConsumerByAadhaar(aadhaar);
         emergencyConsumers.push(formatConsumer(consumer));
       } catch (error) {
         console.error(`Failed to fetch consumer ${aadhaar}:`, error);
       }
     }
+
+    console.log(`✅ Found ${emergencyConsumers.length} consumers needing emergency help`);
 
     return NextResponse.json({
       success: true,
@@ -1137,7 +1162,8 @@ async function handleEmergencyCases() {
     return NextResponse.json({
       success: true,
       data: [],
-      warning: 'No emergency cases data available - blockchain connection issue'
+      warning: 'No emergency cases data available - blockchain connection issue',
+      error: error.message
     });
   }
 }
