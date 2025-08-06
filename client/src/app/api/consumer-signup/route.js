@@ -33,10 +33,9 @@ export async function POST(request) {
       );
     }
 
-    // Check if consumer already exists with detailed error messages
+    // Check if consumer already exists with detailed error messages (excluding phone number)
     const existingRequests = await ConsumerSignupRequest.find({
       $or: [
-        { phone },
         { rationCardId },
         { aadharNumber }
       ]
@@ -45,7 +44,6 @@ export async function POST(request) {
     if (existingRequests.length > 0) {
       const conflicts = [];
       existingRequests.forEach(req => {
-        if (req.phone === phone) conflicts.push('phone number');
         if (req.rationCardId === rationCardId) conflicts.push('ration card ID');
         if (req.aadharNumber === aadharNumber) conflicts.push('Aadhar number');
       });
@@ -80,10 +78,9 @@ export async function POST(request) {
     console.error('Error creating consumer signup request:', error);
     
     if (error.code === 11000) {
-      // Handle specific duplicate key errors
+      // Handle specific duplicate key errors (excluding phone number)
       let field = 'information';
-      if (error.keyPattern?.phone) field = 'phone number';
-      else if (error.keyPattern?.rationCardId) field = 'ration card ID';
+      if (error.keyPattern?.rationCardId) field = 'ration card ID';
       else if (error.keyPattern?.aadharNumber) field = 'Aadhar number';
       
       return NextResponse.json(

@@ -66,10 +66,23 @@ try {
     adminWallet
   );
 
-  // Add Diamond contract initialization
+  // Add Diamond contract initialization with merged ABI
+  function getMergedABI() {
+    const mergedABI = [];
+    if (DiamondMergedABI.contracts) {
+      Object.keys(DiamondMergedABI.contracts).forEach(contractName => {
+        const contractData = DiamondMergedABI.contracts[contractName];
+        if (contractData.abi && Array.isArray(contractData.abi)) {
+          mergedABI.push(...contractData.abi);
+        }
+      });
+    }
+    return mergedABI;
+  }
+  
   diamondContract = new ethers.Contract(
     CONTRACT_ADDRESS,
-    DiamondMergedABI,
+    getMergedABI(),
     provider
   );
 

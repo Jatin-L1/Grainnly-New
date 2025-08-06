@@ -34,10 +34,9 @@ export async function POST(request) {
       );
     }
 
-    // Check if delivery partner already exists
+    // Check if delivery partner already exists (excluding phone number)
     const existingRequest = await DeliverySignupRequest.findOne({
       $or: [
-        { phone },
         { licenseNumber },
         { walletAddress }
       ]
@@ -45,8 +44,7 @@ export async function POST(request) {
 
     if (existingRequest) {
       let errorMessage = 'A signup request already exists with this ';
-      if (existingRequest.phone === phone) errorMessage += 'phone number';
-      else if (existingRequest.licenseNumber === licenseNumber) errorMessage += 'license number';
+      if (existingRequest.licenseNumber === licenseNumber) errorMessage += 'license number';
       else if (existingRequest.walletAddress === walletAddress) errorMessage += 'wallet address';
       
       return NextResponse.json(

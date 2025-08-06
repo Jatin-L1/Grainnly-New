@@ -14,15 +14,15 @@ export const registerDeliveryRider = async (req, res) => {
       });
     }
 
-    // Check if rider with same email or phone already exists
+    // Check if rider with same email already exists
     const existingRider = await DeliveryRider.findOne({
-      $or: [{ email }, { phone }],
+      email: email
     });
 
     if (existingRider) {
       return res.status(409).json({
         success: false,
-        message: "A rider with this email or phone already exists",
+        message: "A rider with this email already exists",
       });
     }
 

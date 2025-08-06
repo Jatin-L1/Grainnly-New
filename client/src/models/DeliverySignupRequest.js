@@ -73,7 +73,6 @@ blockchainTxHash: {
 
 // Index for faster queries
 DeliverySignupRequestSchema.index({ status: 1, submittedAt: -1 });
-DeliverySignupRequestSchema.index({ phone: 1 }, { unique: true });
 DeliverySignupRequestSchema.index({ licenseNumber: 1 }, { unique: true });
 DeliverySignupRequestSchema.index({ walletAddress: 1 }, { unique: true });
 

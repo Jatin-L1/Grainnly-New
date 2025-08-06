@@ -6,6 +6,20 @@ import { ethers } from "ethers";
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
 const ABI = require("../../../../abis/DiamondMergedABI.json");
 
+// Function to merge all facet ABIs for Diamond proxy
+function getMergedABI() {
+  const mergedABI = [];
+  if (ABI.contracts) {
+    Object.keys(ABI.contracts).forEach(contractName => {
+      const contractData = ABI.contracts[contractName];
+      if (contractData.abi && Array.isArray(contractData.abi)) {
+        mergedABI.push(...contractData.abi);
+      }
+    });
+  }
+  return mergedABI;
+}
+
 export async function POST(request) {
   try {
     const { walletAddress } = await request.json();
@@ -38,7 +52,7 @@ export async function POST(request) {
         console.log("📍 Amoy RPC URL:", process.env.NEXT_PUBLIC_RPC_URL || "https://polygon-amoy.g.alchemy.com/v2/xMcrrdg5q8Pdtqa6itPOK");
         
         const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL || "https://polygon-amoy.g.alchemy.com/v2/xMcrrdg5q8Pdtqa6itPOK");
-        const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, provider);
+        const contract = new ethers.Contract(CONTRACT_ADDRESS, getMergedABI(), provider);
         
         const shopkeeperInfo = await contract.getShopkeeperInfo(walletAddress);
         console.log("🔍 Blockchain response:", {

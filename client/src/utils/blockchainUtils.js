@@ -5,6 +5,20 @@ import contractABI from '../../abis/DiamondMergedABI.json';
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0x3329CA690f619bae73b9f36eb43839892D20045f';
 const POLYGON_RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || 'https://polygon-amoy.g.alchemy.com/v2/xMcrrdg5q8Pdtqa6itPOK';
 
+// Function to merge all facet ABIs for Diamond proxy
+function getMergedABI() {
+  const mergedABI = [];
+  if (contractABI.contracts) {
+    Object.keys(contractABI.contracts).forEach(contractName => {
+      const contractData = contractABI.contracts[contractName];
+      if (contractData.abi && Array.isArray(contractData.abi)) {
+        mergedABI.push(...contractData.abi);
+      }
+    });
+  }
+  return mergedABI;
+}
+
 // Get contract instance
 export const getContract = (signer) => {
   try {
@@ -13,7 +27,7 @@ export const getContract = (signer) => {
       return null;
     }
     
-    const contract = new ethers.Contract(CONTRACT_ADDRESS, contractABI, signer);
+    const contract = new ethers.Contract(CONTRACT_ADDRESS, getMergedABI(), signer);
     return contract;
   } catch (error) {
     console.error("Error creating contract instance:", error);
@@ -25,7 +39,7 @@ export const getContract = (signer) => {
 export const getReadOnlyContract = () => {
   try {
     const provider = new ethers.JsonRpcProvider(POLYGON_RPC_URL);
-    const contract = new ethers.Contract(CONTRACT_ADDRESS, contractABI, provider);
+    const contract = new ethers.Contract(CONTRACT_ADDRESS, getMergedABI(), provider);
     return contract;
   } catch (error) {
     console.error("Error creating read-only contract instance:", error);
