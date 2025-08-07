@@ -73,7 +73,7 @@ export async function POST(request) {
     console.log('⏳ Transaction sent, waiting for confirmation...');
     console.log('📋 Transaction hash:', tx.hash);
     
-    const receipt = await tx.wait();
+    const receipt = await tx.wait(1); // Wait for 1 confirmation
     console.log('✅ Registration confirmed!');
     console.log('⛽ Gas used:', receipt.gasUsed.toString());
 

@@ -4,6 +4,7 @@ import { motion } from "framer-motion"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Leaf, AlertCircle, User, Wallet } from "lucide-react"
+import { ethers } from "ethers"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,9 +20,67 @@ import {
 import { MetaMaskConnect } from "@/components/metamask-connect"
 import { AuthLayout } from "@/components/auth-layout"
 import { useMetaMask } from "@/components/MetaMaskProvider"
+import DiamondMergedABI from "../../../abis/DiamondMergedABI.json"
 
 // Admin address constant
 const ADMIN_ADDRESS = "0x37470c74Cc2Cb55AB1CC23b16a05F2DC657E25aa".toLowerCase();
+
+// Blockchain constants
+const DIAMOND_PROXY_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
+const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL;
+
+// Function to get a working RPC provider
+async function getWorkingProvider() {
+  const rpcUrls = [
+    'https://rpc-amoy.polygon.technology/',
+    'https://polygon-amoy-bor-rpc.publicnode.com',
+    RPC_URL
+  ].filter(Boolean);
+  
+  for (const rpcUrl of rpcUrls) {
+    try {
+      const provider = new ethers.JsonRpcProvider(rpcUrl, {
+        name: 'polygon-amoy',
+        chainId: 80002
+      });
+      
+      // Test the connection
+      const network = await provider.getNetwork();
+      console.log(`✅ RPC working: ${rpcUrl} - Chain: ${network.chainId}`);
+      return provider;
+    } catch (error) {
+      console.log(`❌ RPC failed: ${rpcUrl} - ${error.message}`);
+      continue;
+    }
+  }
+  
+  throw new Error('No working RPC provider found');
+}
+
+// Function to get the correct ABI from the merged structure
+function getMergedABI() {
+  const mergedABI = [];
+  const seenFunctions = new Set();
+  
+  if (DiamondMergedABI.contracts) {
+    Object.keys(DiamondMergedABI.contracts).forEach(contractName => {
+      const contractData = DiamondMergedABI.contracts[contractName];
+      if (contractData.abi && Array.isArray(contractData.abi)) {
+        contractData.abi.forEach(item => {
+          const signature = item.type === 'function' 
+            ? `${item.name}(${item.inputs?.map(i => i.type).join(',') || ''})`
+            : item.type;
+          
+          if (!seenFunctions.has(signature)) {
+            seenFunctions.add(signature);
+            mergedABI.push(item);
+          }
+        });
+      }
+    });
+  }
+  return mergedABI;
+}
 
 export default function LoginPage() {
   const router = useRouter()
@@ -33,6 +92,7 @@ export default function LoginPage() {
   const [userType, setUserType] = useState(null)
   const [activeTab, setActiveTab] = useState("consumer")
   const [initialLoad, setInitialLoad] = useState(true)
+  const [useBlockchainAuth, setUseBlockchainAuth] = useState(false) // Toggle for blockchain auth
 
   // Consumer login state
   const [consumerData, setConsumerData] = useState({
@@ -270,6 +330,175 @@ export default function LoginPage() {
       setError(null)
     }
   }
+
+  // Blockchain-based authentication using simpleLogin function
+  const handleBlockchainLogin = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      console.log("🔗 Starting blockchain authentication...");
+
+      if (!walletConnected || !walletAddress) {
+        setError("Please connect your wallet first")
+        return
+      }
+
+      // Get provider and signer
+      console.log("🔗 Getting blockchain provider...");
+      const provider = await getWorkingProvider();
+      
+      // Get signer from MetaMask
+      if (!window.ethereum) {
+        throw new Error("MetaMask not detected");
+      }
+
+      const web3Provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await web3Provider.getSigner();
+      
+      console.log("📝 Signer address:", await signer.getAddress());
+
+      // Get contract ABI and create contract instance
+      const contractABI = getMergedABI();
+      console.log("📋 Contract ABI functions loaded:", contractABI.filter(item => item.type === 'function').length);
+
+      if (!DIAMOND_PROXY_ADDRESS) {
+        throw new Error("Contract address not configured");
+      }
+
+      const contract = new ethers.Contract(DIAMOND_PROXY_ADDRESS, contractABI, signer);
+      console.log("✅ Contract instance created");
+
+      // Check if simpleLogin function exists in ABI
+      const hasSimpleLogin = contractABI.some(item => 
+        item.type === 'function' && item.name === 'simpleLogin'
+      );
+
+      if (!hasSimpleLogin) {
+        console.warn("⚠️ simpleLogin function not found in ABI");
+        setError("Blockchain authentication function not available. The simpleLogin function needs to be added to the contract ABI.");
+        return;
+      }
+
+      console.log("🔍 Calling simpleLogin function...");
+      
+      // Call the simpleLogin function
+      const loginResult = await contract.simpleLogin();
+      console.log("✅ Blockchain login result:", loginResult);
+
+      const [success, role, redirectUrl] = loginResult;
+      
+      if (!success) {
+        setError("Authentication failed. Your wallet is not registered in the system.");
+        return;
+      }
+
+      console.log("✅ Blockchain authentication successful!");
+      console.log("👤 User role:", role);
+      console.log("🔗 Redirect URL:", redirectUrl);
+
+      // Store authentication data based on role
+      const userData = {
+        walletAddress: walletAddress,
+        role: role,
+        authenticatedVia: 'blockchain',
+        timestamp: Date.now()
+      };
+
+      // Set user type and redirect based on blockchain response
+      switch (role) {
+        case "ADMIN":
+          setUserType("admin");
+          localStorage.setItem('currentUser', JSON.stringify({
+            type: 'admin',
+            data: { 
+              ...userData,
+              name: 'System Administrator',
+            }
+          }));
+          router.push("/admin");
+          break;
+
+        case "SHOPKEEPER":
+          setUserType("shopkeeper");
+          // Fetch additional shopkeeper details if needed
+          try {
+            const shopkeeperInfo = await contract.getShopkeeperInfo(walletAddress);
+            localStorage.setItem('currentUser', JSON.stringify({
+              type: 'shopkeeper',
+              data: { 
+                ...userData,
+                ...shopkeeperInfo,
+                source: 'blockchain'
+              }
+            }));
+          } catch (e) {
+            localStorage.setItem('currentUser', JSON.stringify({
+              type: 'shopkeeper',
+              data: userData
+            }));
+          }
+          router.push("/shopkeeper");
+          break;
+
+        case "DELIVERY_AGENT":
+          setUserType("dealer");
+          localStorage.setItem('currentUser', JSON.stringify({
+            type: 'delivery',
+            data: { 
+              ...userData,
+              name: 'Delivery Agent',
+            }
+          }));
+          router.push("/dealer");
+          break;
+
+        case "CONSUMER":
+          setUserType("user");
+          // Fetch consumer details from blockchain
+          try {
+            const consumerInfo = await contract.getConsumerByWallet(walletAddress);
+            localStorage.setItem('currentUser', JSON.stringify({
+              type: 'consumer',
+              data: { 
+                ...userData,
+                ...consumerInfo,
+                aadharNumber: consumerInfo.aadhaar?.toString(),
+                source: 'blockchain'
+              }
+            }));
+            router.push(`/user?aadhaar=${consumerInfo.aadhaar?.toString()}`);
+          } catch (e) {
+            console.warn("Could not fetch consumer details:", e);
+            localStorage.setItem('currentUser', JSON.stringify({
+              type: 'consumer',
+              data: userData
+            }));
+            router.push("/user");
+          }
+          break;
+
+        default:
+          setError(`Unknown user role: ${role}. Please contact administrator.`);
+          return;
+      }
+
+    } catch (error) {
+      console.error("❌ Blockchain authentication error:", error);
+      
+      if (error.message.includes("user rejected")) {
+        setError("Transaction was cancelled by user.");
+      } else if (error.message.includes("execution reverted")) {
+        setError("Authentication failed. Your wallet may not be registered in the system.");
+      } else if (error.message.includes("network")) {
+        setError("Network error. Please check your connection and try again.");
+      } else {
+        setError("Blockchain authentication failed: " + error.message);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleConsumerLogin = async () => {
     try {
@@ -660,6 +889,33 @@ export default function LoginPage() {
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                         <span>Wallet Connected: {walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)}</span>
                       </div>
+                    </div>
+
+                    {/* Blockchain Authentication Toggle */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                      <div className="flex items-center space-x-2 mb-3">
+                        <Checkbox 
+                          id="blockchain-auth" 
+                          checked={useBlockchainAuth}
+                          onCheckedChange={setUseBlockchainAuth}
+                        />
+                        <Label htmlFor="blockchain-auth" className="text-sm font-medium text-blue-900">
+                          Use Blockchain Authentication (Beta)
+                        </Label>
+                      </div>
+                      <p className="text-xs text-blue-700 mb-2">
+                        🔗 Use the smart contract's simpleLogin function to authenticate directly from blockchain
+                      </p>
+                      {useBlockchainAuth && (
+                        <Button
+                          onClick={handleBlockchainLogin}
+                          disabled={isLoading}
+                          className="w-full bg-blue-600 hover:bg-blue-700"
+                          size="sm"
+                        >
+                          {isLoading ? "Authenticating..." : "🔗 Login via Blockchain"}
+                        </Button>
+                      )}
                     </div>
 
                     {isLoading && (

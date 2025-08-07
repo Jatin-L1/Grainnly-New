@@ -21,8 +21,8 @@ export default function AdminTestDataPage() {
           aadhaar: '123456780012',
           name: 'Test Consumer',
           mobile: '+911234567890',
-          category: 'BPL',
-          shopkeeperAddress: '0x0000000000000000000000000000000000000000'
+          category: 'BPL', // You can change this to test different categories
+          shopkeeperAddress: '0x742d35cc6669c4532939f88d9a5c7e4c1d8e8b5c' // Use a valid shopkeeper address
         })
       });
 
@@ -31,7 +31,7 @@ export default function AdminTestDataPage() {
       if (data.success) {
         toast({
           title: "Success",
-          description: "Test consumer registered on blockchain",
+          description: `Test consumer registered on blockchain with category: ${data.consumer?.category}`,
         });
       } else {
         throw new Error(data.error);

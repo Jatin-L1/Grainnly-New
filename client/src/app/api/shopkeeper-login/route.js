@@ -1,23 +1,82 @@
 import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import { ethers } from "ethers";
+import DiamondMergedABI from "../../../../abis/DiamondMergedABI.json";
 
 // Smart contract details
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
-const ABI = require("../../../../abis/DiamondMergedABI.json");
 
 // Function to merge all facet ABIs for Diamond proxy
 function getMergedABI() {
   const mergedABI = [];
-  if (ABI.contracts) {
-    Object.keys(ABI.contracts).forEach(contractName => {
-      const contractData = ABI.contracts[contractName];
+  if (DiamondMergedABI.contracts) {
+    Object.keys(DiamondMergedABI.contracts).forEach(contractName => {
+      const contractData = DiamondMergedABI.contracts[contractName];
       if (contractData.abi && Array.isArray(contractData.abi)) {
         mergedABI.push(...contractData.abi);
       }
     });
   }
   return mergedABI;
+}
+
+// GET endpoint to fetch all shopkeepers from blockchain
+export async function GET(request) {
+  try {
+    console.log("🏪 Fetching all shopkeepers from blockchain...");
+    
+    if (!CONTRACT_ADDRESS) {
+      return NextResponse.json({ success: false, error: "Contract address not configured" });
+    }
+
+    const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL || "https://polygon-amoy.g.alchemy.com/v2/xMcrrdg5q8Pdtqa6itPOK");
+    const contract = new ethers.Contract(CONTRACT_ADDRESS, getMergedABI(), provider);
+    
+    // Try to get all shopkeeper events or use a different method
+    try {
+      // Option 1: Try to get ShopkeeperRegistered events
+      const filter = contract.filters.ShopkeeperRegistered();
+      const events = await contract.queryFilter(filter, 0, 'latest');
+      
+      const shopkeepers = await Promise.all(
+        events.map(async (event) => {
+          const shopkeeperAddress = event.args.shopkeeper;
+          try {
+            const shopkeeperInfo = await contract.getShopkeeperInfo(shopkeeperAddress);
+            return {
+              walletAddress: shopkeeperAddress,
+              name: shopkeeperInfo.name,
+              shopName: shopkeeperInfo.area,
+              area: shopkeeperInfo.area,
+              totalConsumers: shopkeeperInfo.totalConsumersAssigned?.toString() || "0",
+              totalDeliveries: shopkeeperInfo.totalDeliveries?.toString() || "0"
+            };
+          } catch (err) {
+            console.log(`⚠️ Could not get info for shopkeeper ${shopkeeperAddress}:`, err.message);
+            return {
+              walletAddress: shopkeeperAddress,
+              name: `Shopkeeper ${shopkeeperAddress.slice(0, 6)}...${shopkeeperAddress.slice(-4)}`,
+              shopName: "Unknown Shop",
+              area: "Unknown Area"
+            };
+          }
+        })
+      );
+
+      console.log(`✅ Found ${shopkeepers.length} shopkeepers from events`);
+      return NextResponse.json(shopkeepers);
+
+    } catch (eventError) {
+      console.log("⚠️ Could not fetch events, trying alternative method:", eventError.message);
+      
+      // Fallback: Return empty array for now, but indicate success
+      return NextResponse.json([]);
+    }
+
+  } catch (error) {
+    console.error("❌ Error fetching shopkeepers:", error);
+    return NextResponse.json({ success: false, error: error.message });
+  }
 }
 
 export async function POST(request) {

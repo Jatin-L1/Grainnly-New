@@ -1,316 +1,249 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { 
-  AlertCircle, 
-  CheckCircle, 
-  XCircle, 
-  Search,
-  Users,
-  Package,
-  FileText,
-  Calendar,
-  Phone,
-  MapPin,
-  CreditCard,
-  Hash,
-  Filter,
-  ChevronLeft,
-  ChevronRight
-} from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertCircle, Check, X, Phone, IdCard, User, Eye, ExternalLink, RefreshCw } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
+// Available PDS categories
+const availableCategories = [
+  { value: 'BPL', label: 'Below Poverty Line (BPL)' },
+  { value: 'AAY', label: 'Antyodaya Anna Yojana (AAY)' },
+  { value: 'APL', label: 'Above Poverty Line (APL)' },
+  { value: 'PHH', label: 'Priority Household (PHH)' },
+  { value: 'ANNAPURNA', label: 'Annapurna Yojana (ANNAPURNA)' }
+];
 
 export default function ConsumerRequestsPage() {
-  const { toast } = useToast();
-  const [requests, setRequests] = useState([]);
+  const [signupRequests, setSignupRequests] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState({});
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [statusFilter, setStatusFilter] = useState('pending');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [shopkeepers, setShopkeepers] = useState([]);
+  const { toast } = useToast();
 
-  // Shopkeeper states
-  const [allShopkeepers, setAllShopkeepers] = useState([]);
-  const [shopkeepersLoading, setShopkeepersLoading] = useState(false);
+  // Approval dialog state
+  const [selectedRequest, setSelectedRequest] = useState(null);
   const [selectedShopkeeper, setSelectedShopkeeper] = useState('');
-  const [showApprovalDialog, setShowApprovalDialog] = useState(false);
-  const [pendingApprovalRequest, setPendingApprovalRequest] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [approvalLoading, setApprovalLoading] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-  useEffect(() => {
-    fetchRequests();
-    fetchShopkeepers(); // Fetch shopkeepers when component mounts
-  }, [currentPage, statusFilter]);
+  // Fetch signup requests
+  const fetchSignupRequests = async () => {
+    try {
+      const response = await fetch('/api/consumer-signup');
+      if (response.ok) {
+        const data = await response.json();
+        setSignupRequests(data.requests || []);
+      } else {
+        throw new Error('Failed to fetch signup requests');
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load consumer signup requests",
+        variant: "destructive",
+      });
+    }
+  };
 
-  // Fetch shopkeepers for dropdown - Use the working admin API endpoint
+  // Fetch shopkeepers for assignment
   const fetchShopkeepers = async () => {
     try {
-      setShopkeepersLoading(true);
-      console.log('🔍 Fetching shopkeepers from admin API...');
-      
-      // Use the same endpoint that works in admin dashboard
+      console.log("🏪 Fetching shopkeepers from blockchain via admin API...");
       const response = await fetch('/api/admin?endpoint=get-shopkeepers');
-      const data = await response.json();
-      
-      console.log('📋 Raw API response:', data);
-      
-      if (data.success && data.data && Array.isArray(data.data) && data.data.length > 0) {
-        console.log('✅ Found shopkeepers:', data.data.length);
-        console.log('📊 Shopkeeper data:', data.data);
+      if (response.ok) {
+        const data = await response.json();
+        console.log("🔍 Admin API response:", data);
         
-        // Filter only active shopkeepers with valid addresses
-        const validShopkeepers = data.data.filter(shopkeeper => {
-          const hasValidAddress = shopkeeper.shopkeeperAddress && 
-                                 shopkeeper.shopkeeperAddress !== '0x0000000000000000000000000000000000000000';
-          const isActive = shopkeeper.isActive !== false; // Allow true or undefined
-          
-          // Accept shopkeepers from both blockchain and database
-          const isValidSource = shopkeeper.dataSource === 'blockchain' || shopkeeper.dataSource === 'database';
-          
-          console.log(`🔍 ${shopkeeper.name}: Address=${hasValidAddress}, Active=${isActive}, Source=${shopkeeper.dataSource}`);
-          
-          return hasValidAddress && isActive && isValidSource;
-        });
-        
-        console.log('🎯 Valid shopkeepers for assignment:', validShopkeepers.length);
-        setAllShopkeepers(validShopkeepers);
-        
-        toast({
-          title: "Shopkeepers Loaded",
-          description: `Found ${validShopkeepers.length} registered shopkeepers available for assignment`,
-        });
+        if (data.success && Array.isArray(data.data)) {
+          // Map the blockchain data to the expected format
+          const mappedShopkeepers = data.data.map(shopkeeper => ({
+            walletAddress: shopkeeper.shopkeeperAddress || shopkeeper.walletAddress,
+            name: shopkeeper.name || 'Unknown Shop',
+            area: shopkeeper.area || 'Unknown Area',
+            shopName: shopkeeper.area || 'Unknown Area' // Use area as shop name
+          }));
+          setShopkeepers(mappedShopkeepers);
+          console.log(`✅ Found ${mappedShopkeepers.length} shopkeepers from blockchain`);
+        } else {
+          console.log("⚠️ No shopkeepers in response, setting empty array");
+          setShopkeepers([]);
+        }
       } else {
-        // No shopkeepers found
-        console.log('⚠️ No shopkeepers found in response:', data);
-        setAllShopkeepers([]);
-        toast({
-          title: "No Shopkeepers Available",
-          description: "No active shopkeepers are registered. Please register shopkeepers first.",
-          variant: "destructive",
-        });
+        console.error("❌ Failed to fetch shopkeepers, status:", response.status);
+        setShopkeepers([]);
       }
     } catch (error) {
       console.error('❌ Error fetching shopkeepers:', error);
-      setAllShopkeepers([]);
-      toast({
-        title: "Error",
-        description: "Failed to fetch shopkeepers: " + error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setShopkeepersLoading(false);
+      setShopkeepers([]);
     }
   };
 
-  const fetchRequests = async () => {
-    try {
+  useEffect(() => {
+    const loadData = async () => {
       setLoading(true);
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: '10',
-        status: statusFilter
-      });
-      
-      if (searchTerm) {
-        params.append('search', searchTerm);
-      }
-
-      const response = await fetch(`/api/consumer-signup?${params}`);
-      const data = await response.json();
-      
-      if (response.ok) {
-        setRequests(data.requests);
-        setTotalPages(data.pagination.pages);
-      } else {
-        toast({
-          title: "Error",
-          description: data.error || "Failed to fetch requests",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching requests:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch consumer requests",
-        variant: "destructive",
-      });
-    } finally {
+      await Promise.all([fetchSignupRequests(), fetchShopkeepers()]);
       setLoading(false);
-    }
+    };
+    loadData();
+  }, []);
+
+  // Handle approval dialog
+  const handleApprovalClick = (request) => {
+    setSelectedRequest(request);
+    setSelectedShopkeeper('');
+    setSelectedCategory('');
+    setDialogOpen(true);
   };
 
-  const handleSearch = () => {
-    setCurrentPage(1);
-    fetchRequests();
-  };
-
-  // Show approval dialog
-  const showApprovalDialogForRequest = (request) => {
-    setPendingApprovalRequest(request);
-    setSelectedShopkeeper(''); // Reset selection
-    setShowApprovalDialog(true);
-  };
-
-  // Approve consumer with shopkeeper assignment
-  const approveConsumerWithShopkeeper = async () => {
-    if (!pendingApprovalRequest) return;
-    
-    const request = pendingApprovalRequest;
-    const requestId = request._id;
-    
-    if (!selectedShopkeeper) {
+  // Handle registration on blockchain
+  const handleRegisterConsumer = async () => {
+    if (!selectedRequest || !selectedShopkeeper || !selectedCategory) {
       toast({
         title: "Error",
-        description: "Please select a shopkeeper before approving",
+        description: "Please select both shopkeeper and category",
         variant: "destructive",
       });
       return;
     }
 
-    setProcessing(prev => ({...prev, [requestId]: true}));
+    setApprovalLoading(true);
 
     try {
-      // Register consumer on blockchain
-      const registrationResponse = await fetch('/api/admin/register-consumer', {
+      console.log('🚀 Starting consumer registration...');
+      console.log('Request data:', selectedRequest);
+      console.log('Selected shopkeeper:', selectedShopkeeper);
+      console.log('Selected category:', selectedCategory);
+
+      const registrationData = {
+        aadhaar: selectedRequest.aadharNumber,
+        name: selectedRequest.name,
+        mobile: selectedRequest.phone,
+        category: selectedCategory,
+        shopkeeperAddress: selectedShopkeeper
+      };
+
+      console.log('📤 Sending registration data:', registrationData);
+
+      const response = await fetch('/api/admin/register-consumer', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          aadhaar: request.aadharNumber,
-          name: request.name,
-          mobile: request.phone,
-          category: 'BPL', // Default category - you can make this configurable
-          shopkeeperAddress: selectedShopkeeper
-        }),
+        body: JSON.stringify(registrationData),
       });
 
-      const registrationData = await registrationResponse.json();
+      const result = await response.json();
+      console.log('📥 Registration response:', result);
 
-      if (registrationData.success) {
-        // Update request status in database
-        const updateResponse = await fetch('/api/consumer-signup/update', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            requestId,
-            status: 'approved',
-            txHash: registrationData.txHash,
-            assignedShopkeeper: selectedShopkeeper
-          }),
+      if (result.success) {
+        // Show success with transaction details
+        toast({
+          title: "✅ Consumer Registered Successfully!",
+          description: (
+            <div className="space-y-2">
+              <div>Consumer {selectedRequest.name} has been registered on blockchain</div>
+              {result.confirmed ? (
+                <div className="text-green-600">✅ Transaction confirmed</div>
+              ) : (
+                <div className="text-yellow-600">⏳ Transaction processing</div>
+              )}
+              <div className="flex items-center gap-2 mt-2">
+                <a 
+                  href={result.explorerUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
+                >
+                  View on PolygonScan <ExternalLink size={12} />
+                </a>
+              </div>
+            </div>
+          ),
         });
 
-        if (updateResponse.ok) {
-          toast({
-            title: "Success",
-            description: `Consumer ${request.name} approved and registered on blockchain`,
-          });
-          
-          // Close dialog and refresh
-          setShowApprovalDialog(false);
-          setPendingApprovalRequest(null);
-          setSelectedShopkeeper('');
-          fetchRequests(); // Refresh the list
-        } else {
-          throw new Error('Failed to update request status');
-        }
+        // Remove the request from the list and close dialog
+        setSignupRequests(prev => prev.filter(req => req._id !== selectedRequest._id));
+        setDialogOpen(false);
+        setSelectedRequest(null);
+
       } else {
-        throw new Error(registrationData.error || 'Blockchain registration failed');
+        // Show error details
+        toast({
+          title: "❌ Registration Failed",
+          description: (
+            <div className="space-y-2">
+              <div>{result.error}</div>
+              {result.txHash && (
+                <div className="flex items-center gap-2 mt-2">
+                  <a 
+                    href={`https://amoy.polygonscan.com/tx/${result.txHash}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
+                  >
+                    Check transaction <ExternalLink size={12} />
+                  </a>
+                </div>
+              )}
+            </div>
+          ),
+          variant: "destructive",
+        });
       }
 
     } catch (error) {
-      console.error('Error approving consumer:', error);
+      console.error('❌ Registration error:', error);
       toast({
-        title: "Error",
-        description: error.message || "Failed to approve consumer",
+        title: "❌ Registration Error",
+        description: error.message || "Failed to register consumer",
         variant: "destructive",
       });
     } finally {
-      setProcessing(prev => ({...prev, [requestId]: false}));
+      setApprovalLoading(false);
     }
   };
 
-  const rejectConsumer = async (request) => {
-    const requestId = request._id;
-    setProcessing(prev => ({...prev, [requestId]: true}));
-
+  // Handle rejection
+  const handleReject = async (requestId) => {
     try {
-      const response = await fetch('/api/consumer-signup/update', {
-        method: 'PUT',
+      const response = await fetch('/api/consumer-signup', {
+        method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          requestId,
-          status: 'rejected'
-        }),
+        body: JSON.stringify({ id: requestId }),
       });
 
       if (response.ok) {
+        setSignupRequests(prev => prev.filter(req => req._id !== requestId));
         toast({
-          title: "Success",
-          description: `Consumer ${request.name} request rejected`,
+          title: "Request Rejected",
+          description: "Consumer signup request has been rejected",
         });
-        fetchRequests(); // Refresh the list
       } else {
         throw new Error('Failed to reject request');
       }
     } catch (error) {
-      console.error('Error rejecting consumer:', error);
       toast({
         title: "Error",
-        description: "Failed to reject consumer request",
+        description: "Failed to reject request",
         variant: "destructive",
       });
-    } finally {
-      setProcessing(prev => ({...prev, [requestId]: false}));
-    }
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'pending':
-        return <Badge variant="outline" className="text-yellow-600 border-yellow-300"><AlertCircle className="w-3 h-3 mr-1" />Pending</Badge>;
-      case 'approved':
-        return <Badge variant="outline" className="text-green-600 border-green-300"><CheckCircle className="w-3 h-3 mr-1" />Approved</Badge>;
-      case 'rejected':
-        return <Badge variant="outline" className="text-red-600 border-red-300"><XCircle className="w-3 h-3 mr-1" />Rejected</Badge>;
-      default:
-        return <Badge variant="outline">Unknown</Badge>;
     }
   };
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6">
-        <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+      <div className="container mx-auto p-4">
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading consumer requests...</p>
         </div>
       </div>
@@ -318,240 +251,215 @@ export default function ConsumerRequestsPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Consumer Requests</h1>
-        <p className="text-gray-600 mt-2">
-          Manage and approve consumer registration requests
-        </p>
+    <div className="container mx-auto p-4 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Consumer Registration Requests</h1>
+          <p className="text-gray-600">Review and approve consumer signup requests</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            onClick={fetchShopkeepers}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh Shopkeepers ({shopkeepers.length})
+          </Button>
+          <Badge variant="secondary" className="text-lg px-4 py-2">
+            {signupRequests.length} Pending
+          </Badge>
+        </div>
       </div>
 
-      {/* Filters and Search */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-            <div className="flex gap-4 items-center">
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-gray-500" />
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="approved">Approved</SelectItem>
-                    <SelectItem value="rejected">Rejected</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <div className="flex gap-2 items-center">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search by name, phone, or Aadhaar..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-64"
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                />
-              </div>
-              <Button onClick={handleSearch} variant="outline">
-                Search
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Requests List */}
-      <div className="space-y-4">
-        {requests.length === 0 ? (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Requests Found</h3>
-              <p className="text-gray-600">
-                {statusFilter === 'pending' ? 'No pending consumer requests at the moment.' : `No ${statusFilter} requests found.`}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          requests.map((request) => (
-            <Card key={request._id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 space-y-3">
-                    <div className="flex items-center gap-3">
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        {request.name}
-                      </h3>
-                      {getStatusBadge(request.status)}
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-                      <div className="flex items-center gap-2">
-                        <Hash className="h-4 w-4 text-gray-400" />
-                        <span className="text-gray-600">Aadhaar:</span>
-                        <span className="font-mono">{request.aadharNumber}</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-gray-400" />
-                        <span className="text-gray-600">Phone:</span>
-                        <span>{request.phone}</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-gray-400" />
-                        <span className="text-gray-600">Address:</span>
-                        <span className="truncate" title={request.address}>
-                          {request.address}
-                        </span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-gray-400" />
-                        <span className="text-gray-600">Family:</span>
-                        <span>{request.familyMembers} members</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-gray-400" />
-                        <span className="text-gray-600">Submitted:</span>
-                        <span>{formatDate(request.createdAt)}</span>
-                      </div>
-                    </div>
-                    
-                    {request.adminNote && (
-                      <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                        <p className="text-sm text-gray-700">
-                          <strong>Admin Note:</strong> {request.adminNote}
-                        </p>
-                      </div>
-                    )}
+      {signupRequests.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Check className="h-12 w-12 text-green-500 mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No Pending Requests</h3>
+            <p className="text-gray-600 text-center">
+              All consumer registration requests have been processed.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
+          {signupRequests.map((request) => (
+            <Card key={request._id} className="border-l-4 border-l-blue-500">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  {request.name}
+                </CardTitle>
+                <div className="text-sm text-gray-500">
+                  Submitted: {new Date(request.createdAt).toLocaleString()}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="flex items-center gap-2">
+                    <IdCard className="h-4 w-4" />
+                    <span className="font-medium">Aadhaar:</span>
+                    <span className="font-mono">{request.aadharNumber}</span>
                   </div>
-                  
-                  <div className="ml-6 flex flex-col gap-2">
-                    {request.status === 'pending' && (
-                      <>
-                        <Button
-                          onClick={() => showApprovalDialogForRequest(request)}
-                          disabled={processing[request._id]}
-                          className="bg-green-600 hover:bg-green-700"
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-4 w-4" />
+                    <span className="font-medium">Mobile:</span>
+                    <span>{request.phone}</span>
+                  </div>
+                  <div className="col-span-2 flex items-center gap-2">
+                    <IdCard className="h-4 w-4" />
+                    <span className="font-medium">Ration Card:</span>
+                    <span className="font-mono">{request.rationCardId}</span>
+                  </div>
+                  <div className="col-span-2 text-sm">
+                    <span className="font-medium">Address:</span>
+                    <span className="ml-2 text-gray-700">{request.homeAddress}</span>
+                  </div>
+                </div>
+
+                {request.email && (
+                  <div className="text-sm">
+                    <span className="font-medium">Email:</span> {request.email}
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-4">
+                  <Dialog open={dialogOpen && selectedRequest?._id === request._id} onOpenChange={(open) => {
+                    if (!open) {
+                      setDialogOpen(false);
+                      setSelectedRequest(null);
+                    }
+                  }}>
+                    <DialogTrigger asChild>
+                      <Button 
+                        className="flex-1" 
+                        onClick={() => handleApprovalClick(request)}
+                      >
+                        <Check className="h-4 w-4 mr-2" />
+                        Approve & Register
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[500px]">
+                      <DialogHeader>
+                        <DialogTitle>Register Consumer on Blockchain</DialogTitle>
+                        <DialogDescription>
+                          Complete the registration for <strong>{request.name}</strong> by selecting a shopkeeper and category.
+                        </DialogDescription>
+                      </DialogHeader>
+                      
+                      <div className="space-y-6 py-4">
+                        {/* Consumer Details */}
+                        <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                          <h4 className="font-medium text-gray-900">Consumer Details</h4>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div><span className="font-medium">Name:</span> {request.name}</div>
+                            <div><span className="font-medium">Aadhaar:</span> {request.aadharNumber}</div>
+                            <div><span className="font-medium">Mobile:</span> {request.phone}</div>
+                            <div><span className="font-medium">Ration Card:</span> {request.rationCardId}</div>
+                            <div className="col-span-2"><span className="font-medium">Address:</span> {request.homeAddress}</div>
+                            {request.email && <div className="col-span-2"><span className="font-medium">Email:</span> {request.email}</div>}
+                          </div>
+                        </div>
+
+                        {/* Shopkeeper Selection */}
+                        <div className="space-y-2">
+                          <Label htmlFor="shopkeeper">Assign Shopkeeper *</Label>
+                          <Select value={selectedShopkeeper} onValueChange={setSelectedShopkeeper}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a shopkeeper" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {shopkeepers.length === 0 ? (
+                                <SelectItem value="no-shopkeepers" disabled>No shopkeepers available</SelectItem>
+                              ) : (
+                                shopkeepers.map((shopkeeper) => (
+                                  <SelectItem key={shopkeeper.walletAddress} value={shopkeeper.walletAddress}>
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">{shopkeeper.name}</span>
+                                      <span className="text-xs text-gray-500">{shopkeeper.area} • {shopkeeper.walletAddress.slice(0, 6)}...{shopkeeper.walletAddress.slice(-4)}</span>
+                                    </div>
+                                  </SelectItem>
+                                ))
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Category Selection */}
+                        <div className="space-y-2">
+                          <Label htmlFor="category">Consumer Category *</Label>
+                          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select consumer category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableCategories.map((category) => (
+                                <SelectItem key={category.value} value={category.value}>
+                                  {category.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Warning */}
+                        <div className="flex items-start gap-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                          <div className="text-sm">
+                            <p className="font-medium text-yellow-800">Blockchain Registration</p>
+                            <p className="text-yellow-700 mt-1">
+                              This will register the consumer on the Polygon Amoy blockchain. 
+                              Make sure the details are correct as this cannot be easily undone.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <DialogFooter className="gap-2">
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setDialogOpen(false)}
+                          disabled={approvalLoading}
                         >
-                          {processing[request._id] ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          Cancel
+                        </Button>
+                        <Button 
+                          onClick={handleRegisterConsumer} 
+                          disabled={!selectedShopkeeper || !selectedCategory || approvalLoading}
+                          className="min-w-[120px]"
+                        >
+                          {approvalLoading ? (
+                            <div className="flex items-center gap-2">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              <span>Registering...</span>
+                            </div>
                           ) : (
                             <>
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Approve
+                              <Check className="h-4 w-4 mr-2" />
+                              Register on Blockchain
                             </>
                           )}
                         </Button>
-                        
-                        <Button
-                          variant="outline"
-                          onClick={() => rejectConsumer(request)}
-                          disabled={processing[request._id]}
-                          className="border-red-300 text-red-600 hover:bg-red-50"
-                        >
-                          <XCircle className="h-4 w-4 mr-1" />
-                          Reject
-                        </Button>
-                      </>
-                    )}
-                  </div>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleReject(request._id)}
+                    className="text-red-600 border-red-200 hover:bg-red-50"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Reject
+                  </Button>
                 </div>
               </CardContent>
             </Card>
-          ))
-        )}
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-            disabled={currentPage === 1}
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Previous
-          </Button>
-          
-          <span className="px-4 py-2 text-sm text-gray-600">
-            Page {currentPage} of {totalPages}
-          </span>
-          
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-            disabled={currentPage === totalPages}
-          >
-            Next
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+          ))}
         </div>
       )}
-
-      {/* Approval Dialog */}
-      <Dialog open={showApprovalDialog} onOpenChange={setShowApprovalDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Approve Consumer Request</DialogTitle>
-            <DialogDescription>
-              Select a shopkeeper to assign to {pendingApprovalRequest?.name}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div>
-              <Label>Assign Shopkeeper</Label>
-              <Select value={selectedShopkeeper} onValueChange={setSelectedShopkeeper}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder={shopkeepersLoading ? "Loading shopkeepers..." : "Select a shopkeeper"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {shopkeepersLoading ? (
-                    <SelectItem value="loading" disabled>Loading...</SelectItem>
-                  ) : allShopkeepers.length === 0 ? (
-                    <SelectItem value="none" disabled>No shopkeepers available</SelectItem>
-                  ) : (
-                    allShopkeepers.map((shopkeeper) => (
-                      <SelectItem key={shopkeeper.shopkeeperAddress} value={shopkeeper.shopkeeperAddress}>
-                        {shopkeeper.name} - {shopkeeper.area}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowApprovalDialog(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={approveConsumerWithShopkeeper}
-              disabled={!selectedShopkeeper || processing[pendingApprovalRequest?._id]}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              {processing[pendingApprovalRequest?._id] ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-              ) : (
-                <CheckCircle className="h-4 w-4 mr-2" />
-              )}
-              Approve & Assign
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

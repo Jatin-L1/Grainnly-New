@@ -11,24 +11,65 @@ const DIAMOND_PROXY_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL;
 const DCVTOKEN_ADDRESS = process.env.NEXT_PUBLIC_DCVTOKEN_ADDRESS;
 
+// Use multiple RPC providers for better reliability
+const FALLBACK_RPCS = [
+  'https://rpc-amoy.polygon.technology/',
+  'https://polygon-amoy-bor-rpc.publicnode.com'
+];
+
+// Function to get a working RPC provider
+async function getWorkingProvider() {
+  const rpcUrls = [
+    'https://rpc-amoy.polygon.technology/',
+    'https://polygon-amoy-bor-rpc.publicnode.com',
+    RPC_URL // Try user's RPC last since it was giving errors
+  ].filter(Boolean);
+  
+  for (const rpcUrl of rpcUrls) {
+    try {
+      console.log(`🔗 Trying RPC: ${rpcUrl}`);
+      const provider = new ethers.JsonRpcProvider(rpcUrl, {
+        name: 'polygon-amoy',
+        chainId: 80002
+      });
+      
+      // Test the connection
+      const network = await provider.getNetwork();
+      console.log(`✅ RPC working: ${rpcUrl} - Chain: ${network.chainId}`);
+      return provider;
+    } catch (error) {
+      console.log(`❌ RPC failed: ${rpcUrl} - ${error.message}`);
+      continue;
+    }
+  }
+  
+  throw new Error('No working RPC provider found');
+}
+
 const cardClass = "rounded-xl shadow border border-green-100 bg-white p-5 flex flex-col gap-2";
 const statLabel = "text-xs text-gray-500 font-medium";
 const statValue = "text-2xl font-bold text-green-900";
 const statIcon = "h-6 w-6 text-green-600";
 
 // Function to get the correct ABI from the merged structure
-function getContractABI() {
-  if (DiamondMergedABI.contracts && DiamondMergedABI.contracts.Diamond && DiamondMergedABI.contracts.Diamond.abi) {
-    return DiamondMergedABI.contracts.Diamond.abi;
-  }
-  
-  // Fallback to merged ABI approach if structure is different
+function getMergedABI() {
   const mergedABI = [];
+  const seenFunctions = new Set();
+  
   if (DiamondMergedABI.contracts) {
     Object.keys(DiamondMergedABI.contracts).forEach(contractName => {
       const contractData = DiamondMergedABI.contracts[contractName];
       if (contractData.abi && Array.isArray(contractData.abi)) {
-        mergedABI.push(...contractData.abi);
+        contractData.abi.forEach(item => {
+          const signature = item.type === 'function' 
+            ? `${item.name}(${item.inputs?.map(i => i.type).join(',') || ''})`
+            : item.type;
+          
+          if (!seenFunctions.has(signature)) {
+            seenFunctions.add(signature);
+            mergedABI.push(item);
+          }
+        });
       }
     });
   }
@@ -122,60 +163,88 @@ export default function ConsumerDashboard() {
         
         console.log("🔍 Starting data fetch for aadhaar:", aadhaar);
         console.log("🔗 Contract address:", DIAMOND_PROXY_ADDRESS);
-        console.log("🌐 RPC URL:", RPC_URL);
         
-        if (!DIAMOND_PROXY_ADDRESS || !RPC_URL) {
-          throw new Error("Contract address or RPC URL not configured");
+        if (!DIAMOND_PROXY_ADDRESS) {
+          throw new Error("Contract address not configured");
         }
         
-        const provider = new ethers.JsonRpcProvider(RPC_URL);
+        // Use working RPC provider
+        console.log("🔗 Finding working RPC provider...");
+        const provider = await getWorkingProvider();
         
-        // Use the corrected ABI structure - same as other working files
-        const contractABI = getContractABI();
+        // Use the same merged ABI approach as register-consumer route
+        const contractABI = getMergedABI();
         console.log('📋 Contract ABI length:', contractABI.length);
         
         // Debug: List all available functions in the ABI
         const availableFunctions = contractABI
           .filter(item => item.type === 'function')
           .map(item => item.name);
-        console.log('📋 Available functions in ABI:', availableFunctions.slice(0, 10), '... and', availableFunctions.length - 10, 'more');
-        
-        // Check for specific functions we need
-        const importantFunctions = ['getTotalConsumers', 'getConsumerDashboard', 'getConsumerByAadhaar'];
-        importantFunctions.forEach(funcName => {
-          const hasFunction = contractABI.find(item => 
-            item.type === 'function' && item.name === funcName
-          );
-          console.log(`🔍 ${funcName} function found in ABI:`, !!hasFunction);
-        });
+        console.log('📋 Available functions in ABI:', availableFunctions.length);
         
         const contract = new ethers.Contract(DIAMOND_PROXY_ADDRESS, contractABI, provider);
         const aadhaarBigInt = BigInt(aadhaar);
 
-        // Start with the consumer-specific functions - primary connection test
-        console.log("🧪 Testing contract connection with getConsumerDashboard...");
-        
+        console.log("� Testing contract connection...");
         try {
-          console.log("🧪 Testing getConsumerDashboard function...");
-          const dashboardTest = await contract.getConsumerDashboard(aadhaarBigInt);
-          console.log("✅ getConsumerDashboard test successful:", dashboardTest);
-          console.log("✅ Contract connection verified!");
-        } catch (dashboardTestError) {
-          console.warn("⚠️ getConsumerDashboard test failed:", dashboardTestError.message);
-          // If this specific consumer doesn't exist, that's okay - we'll continue
-          if (!dashboardTestError.message.includes("Consumer not found")) {
-            console.error("❌ Contract connection failed with unexpected error:", dashboardTestError.message);
+          // Test contract connection first
+          const network = await provider.getNetwork();
+          console.log("✅ Connected to network:", network.name, "chainId:", network.chainId);
+          
+          // Test contract code exists
+          const code = await provider.getCode(DIAMOND_PROXY_ADDRESS);
+          if (code === '0x') {
+            throw new Error('Contract not deployed at this address');
           }
+          console.log("✅ Contract code found at address");
+        } catch (connectionError) {
+          console.error("❌ Contract connection failed:", connectionError);
+          throw new Error("Failed to connect to blockchain: " + connectionError.message);
         }
 
         console.log("👤 Fetching consumer profile...");
         try {
           const profileData = await contract.getConsumerByAadhaar(aadhaarBigInt);
           console.log("✅ Profile data:", profileData);
+          
+          // Check if consumer exists (not zero address)
+          if (!profileData || profileData.aadhaar.toString() === '0') {
+            console.warn("⚠️ Consumer not found on blockchain");
+            
+            // Check which consumers are actually registered
+            console.log("🔍 Checking for registered consumers...");
+            try {
+              // Try some test Aadhaar numbers that might be registered
+              const testAadhaars = ['999888777666', '123456789012', '111111111111', '222222222222'];
+              for (const testAadhaar of testAadhaars) {
+                try {
+                  const testProfile = await contract.getConsumerByAadhaar(BigInt(testAadhaar));
+                  if (testProfile && testProfile.aadhaar.toString() !== '0') {
+                    console.log(`✅ Found registered consumer: ${testAadhaar}`, testProfile);
+                  }
+                } catch (e) {
+                  // Ignore individual test failures
+                }
+              }
+            } catch (searchError) {
+              console.warn("Could not search for registered consumers");
+            }
+            
+            setError(`Consumer with Aadhaar ${aadhaar} not found on blockchain. 
+
+🔍 This might mean:
+1. The consumer hasn't been approved by admin yet
+2. The Aadhaar number is incorrect
+3. Try using Aadhaar: 999888777666 (recently registered consumer)
+
+Please contact admin or check your registration status.`);
+            return;
+          }
+          
           setProfile(profileData);
           
-          // If we have profile data, fetch related information
-          if (profileData && profileData.assignedShopkeeper && profileData.assignedShopkeeper !== ethers.ZeroAddress) {
+          // If we have profile data, fetch shopkeeper info
+          if (profileData.assignedShopkeeper && profileData.assignedShopkeeper !== ethers.ZeroAddress) {
             console.log("🏪 Fetching shopkeeper info...");
             try {
               const shopkeeperInfo = await contract.getShopkeeperInfo(profileData.assignedShopkeeper);
@@ -188,226 +257,126 @@ export default function ConsumerDashboard() {
           
         } catch (profileError) {
           console.warn("⚠️ Profile fetch failed:", profileError.message);
-          if (profileError.message.includes("Consumer not found")) {
-            // Set a helpful error message
-            setError(`Consumer with Aadhaar ${aadhaar} not found in the system. Try using Aadhaar: 123456780012 (test consumer)`);
-            return; // Exit early if consumer doesn't exist
+          if (profileError.message.includes("execution reverted")) {
+            setError(`Consumer with Aadhaar ${aadhaar} not found on blockchain.
+
+🔍 Available test consumers:
+- Aadhaar: 999888777666 (New Consumer - recently registered)
+- Contact admin if you need to be registered
+
+Please try with a registered Aadhaar number.`);
+            return;
           }
+          throw profileError;
         }
 
-        console.log("📊 Fetching consumer dashboard...");
-        try {
-          const dashboardData = await contract.getConsumerDashboard(aadhaarBigInt);
-          console.log("✅ Dashboard data:", dashboardData);
-          setDashboard(dashboardData);
-        } catch (dashboardError) {
-          console.warn("⚠️ Dashboard fetch failed:", dashboardError.message);
-          // Continue without dashboard data
-        }
+        // Fetch additional dashboard data
+        console.log("📊 Fetching dashboard data...");
+        const dashboardPromises = [];
+        
+        // Try to fetch dashboard data
+        dashboardPromises.push(
+          contract.getConsumerDashboard(aadhaarBigInt)
+            .then(data => {
+              console.log("✅ Dashboard data:", data);
+              setDashboard(data);
+            })
+            .catch(err => {
+              console.warn("⚠️ Dashboard fetch failed:", err.message);
+              setDashboard(null);
+            })
+        );
 
-        console.log("🎫 Fetching unclaimed tokens...");
-        try {
-          const tokens = await contract.getUnclaimedTokensByAadhaar(aadhaarBigInt);
-          console.log("✅ Unclaimed tokens:", tokens);
-          setUnclaimedTokens(Array.isArray(tokens) ? tokens : []);
-        } catch (tokensError) {
-          console.warn("⚠️ Unclaimed tokens fetch failed:", tokensError.message);
-          setUnclaimedTokens([]);
-        }
+        // Try to fetch unclaimed tokens
+        dashboardPromises.push(
+          contract.getUnclaimedTokensByAadhaar(aadhaarBigInt)
+            .then(tokens => {
+              console.log("✅ Unclaimed tokens:", tokens);
+              setUnclaimedTokens(Array.isArray(tokens) ? tokens : []);
+            })
+            .catch(err => {
+              console.warn("⚠️ Unclaimed tokens fetch failed:", err.message);
+              setUnclaimedTokens([]);
+            })
+        );
 
-        console.log("📅 Checking monthly token status...");
-        try {
-          const hasToken = await contract.hasConsumerReceivedMonthlyToken(aadhaarBigInt);
-          console.log("✅ Has monthly token:", hasToken);
-          setHasMonthlyToken(hasToken);
-        } catch (monthlyError) {
-          console.warn("⚠️ Monthly token check failed:", monthlyError.message);
-          setHasMonthlyToken(false);
-        }
+        // Try to check monthly token status
+        dashboardPromises.push(
+          contract.hasConsumerReceivedMonthlyToken(aadhaarBigInt)
+            .then(hasToken => {
+              console.log("✅ Has monthly token:", hasToken);
+              setHasMonthlyToken(hasToken);
+            })
+            .catch(err => {
+              console.warn("⚠️ Monthly token check failed:", err.message);
+              setHasMonthlyToken(false);
+            })
+        );
 
-        console.log("📜 Fetching distribution history...");
-        try {
-          const history = await contract.getConsumerDistributionHistory(aadhaarBigInt, 6);
-          console.log("✅ Distribution history:", history);
-          setDistributionHistory(history);
-        } catch (historyError) {
-          console.warn("⚠️ Distribution history fetch failed:", historyError.message);
-          setDistributionHistory(null);
-        }
+        // Try to fetch distribution history
+        dashboardPromises.push(
+          contract.getConsumerDistributionHistory(aadhaarBigInt, 6)
+            .then(history => {
+              console.log("✅ Distribution history:", history);
+              setDistributionHistory(history);
+            })
+            .catch(err => {
+              console.warn("⚠️ Distribution history fetch failed:", err.message);
+              setDistributionHistory(null);
+            })
+        );
 
-        console.log("💰 Fetching wallet address...");
-        let walletAddr = null;
-        try {
-          walletAddr = await contract.getWalletByAadhaar(aadhaarBigInt);
-          console.log("✅ Wallet address:", walletAddr);
-          setWallet(walletAddr);
-        } catch (walletError) {
-          console.warn("⚠️ Wallet fetch failed:", walletError.message);
-          setWallet(null);
-        }
+        // Try to fetch wallet address
+        dashboardPromises.push(
+          contract.getWalletByAadhaar(aadhaarBigInt)
+            .then(walletAddr => {
+              console.log("✅ Wallet address:", walletAddr);
+              setWallet(walletAddr);
+            })
+            .catch(err => {
+              console.warn("⚠️ Wallet fetch failed:", err.message);
+              setWallet(null);
+            })
+        );
 
-        console.log("📈 Fetching system stats...");
-        try {
-          // Try different function names that might exist in the ABI
-          let stats = null;
-          try {
-            stats = await contract.getDashboardData();
-            console.log("✅ System stats (getDashboardData):", stats);
-          } catch (dashboardDataError) {
+        // Try to fetch system stats
+        dashboardPromises.push(
+          Promise.resolve().then(async () => {
             try {
-              stats = await contract.getSystemStatus();
-              console.log("✅ System stats (getSystemStatus):", stats);
-            } catch (systemStatusError) {
-              console.warn("⚠️ Both getDashboardData and getSystemStatus failed");
-              stats = null;
+              const stats = await contract.getDashboardData();
+              console.log("✅ System stats:", stats);
+              setSystemStats(stats);
+            } catch (statsError) {
+              console.warn("⚠️ System stats fetch failed:", statsError.message);
+              setSystemStats(null);
             }
-          }
-          
-          if (stats) {
-            setSystemStats(stats);
-          }
-        } catch (statsError) {
-          console.warn("⚠️ System stats fetch failed:", statsError.message);
-        }
+          })
+        );
 
-        console.log("🌾 Fetching ration amounts...");
-        try {
-          const rationAmts = await contract.getRationAmounts();
-          console.log("✅ Ration amounts:", rationAmts);
-          setRationAmounts(rationAmts);
-        } catch (rationError) {
-          console.warn("⚠️ Ration amounts fetch failed:", rationError.message);
-        }
+        // Try to fetch ration amounts
+        dashboardPromises.push(
+          contract.getRationAmounts()
+            .then(rationAmts => {
+              console.log("✅ Ration amounts:", rationAmts);
+              setRationAmounts(rationAmts);
+            })
+            .catch(err => {
+              console.warn("⚠️ Ration amounts fetch failed:", err.message);
+              setRationAmounts(null);
+            })
+        );
 
-        // ========== MISSING FUNCTIONS - ADDING NOW ==========
-
-        // Current system state functions
-        console.log("📅 Fetching current system state...");
-        try {
-          const currentMonth = await contract.getCurrentMonth();
-          const currentYear = await contract.getCurrentYear();
-          const systemStatus = await contract.getSystemStatus();
-          console.log("✅ Current Month:", currentMonth.toString());
-          console.log("✅ Current Year:", currentYear.toString());
-          console.log("✅ System Status:", systemStatus);
-          
-          // Set these to state
-          setCurrentMonth(currentMonth);
-          setCurrentYear(currentYear);
-          setSystemStatus(systemStatus);
-        } catch (systemStateError) {
-          console.warn("⚠️ System state fetch failed:", systemStateError.message);
-        }
-
-        // Token status checking for unclaimed tokens
-        if (unclaimedTokens.length > 0) {
-          console.log("🔍 Checking token statuses for unclaimed tokens...");
-          try {
-            const tokenStatuses = await Promise.all(
-              unclaimedTokens.slice(0, 5).map(async (tokenId) => { // Limit to first 5 for performance
-                try {
-                  // Note: These functions are on the DCVToken contract, not the main contract
-                  const dcvTokenContract = new ethers.Contract(DCVTOKEN_ADDRESS, DCVTokenABI, provider);
-                  
-                  const exists = await dcvTokenContract.tokenExists(tokenId);
-                  const claimed = await dcvTokenContract.isTokenClaimed(tokenId);
-                  const expired = await dcvTokenContract.isTokenExpired(tokenId);
-                  const tokenData = await dcvTokenContract.getTokenData(tokenId);
-                  
-                  return { tokenId, exists, claimed, expired, tokenData };
-                } catch (tokenError) {
-                  console.warn(`⚠️ Token ${tokenId} status check failed:`, tokenError.message);
-                  return { tokenId, exists: false, claimed: false, expired: false, tokenData: null };
-                }
-              })
-            );
-            console.log("✅ Token statuses:", tokenStatuses);
-            setTokenStatuses(tokenStatuses);
-          } catch (tokenError) {
-            console.warn("⚠️ Token status batch check failed:", tokenError.message);
-          }
-        }
-
-        // Payment/subsidy information
-        console.log("💰 Fetching payment history and calculations...");
-        try {
-          const paymentHistory = await contract.getConsumerPaymentHistory(aadhaarBigInt);
-          console.log("✅ Payment history:", paymentHistory);
-          setPaymentHistory(paymentHistory);
-
-          // If there are unclaimed tokens, calculate payment amounts
-          if (unclaimedTokens.length > 0) {
-            const paymentCalculations = await Promise.all(
-              unclaimedTokens.slice(0, 3).map(async (tokenId) => { // Limit to first 3
-                try {
-                  const calculation = await contract.calculatePaymentAmount(aadhaarBigInt, tokenId);
-                  return { tokenId, ...calculation };
-                } catch (calcError) {
-                  console.warn(`⚠️ Payment calculation for token ${tokenId} failed:`, calcError.message);
-                  return { tokenId, totalAmount: 0, subsidyAmount: 0, payableAmount: 0 };
-                }
-              })
-            );
-            console.log("✅ Payment calculations:", paymentCalculations);
-            setPaymentCalculations(paymentCalculations);
-          }
-        } catch (paymentError) {
-          console.warn("⚠️ Payment info fetch failed:", paymentError.message);
-        }
-
-        // Check delivery status
-        console.log("🚚 Checking delivery status...");
-        try {
-          const pendingDeliveries = await contract.hasConsumerPendingDeliveries(aadhaarBigInt);
-          console.log("✅ Pending deliveries count:", pendingDeliveries.toString());
-          setPendingDeliveries(pendingDeliveries);
-        } catch (deliveryError) {
-          console.warn("⚠️ Delivery status check failed:", deliveryError.message);
-        }
-
-        // Get all tokens for reference (optional - might be a lot of data)
-        try {
-          const allTokens = await contract.getAllTokens();
-          console.log("📋 Total tokens in system:", allTokens.length);
-          // Don't set to state as it might be too much data
-        } catch (allTokensError) {
-          console.warn("⚠️ All tokens fetch failed (this is optional):", allTokensError.message);
-        }
-
-        // --- DCV Token Section ---
-        if (walletAddr && walletAddr !== ethers.ZeroAddress && DCVTOKEN_ADDRESS) {
-          console.log("🪙 Fetching DCV tokens...");
-          try {
-            const dcvToken = new ethers.Contract(DCVTOKEN_ADDRESS, DCVTokenABI, provider);
-            // For demo, check token IDs 1 to 10
-            const tokenIds = Array.from({ length: 10 }, (_, i) => i + 1);
-            const balances = await Promise.all(
-              tokenIds.map(tokenId => dcvToken.balanceOf(walletAddr, tokenId))
-            );
-            const ownedTokens = tokenIds
-              .map((tokenId, idx) => ({ tokenId, balance: balances[idx] }))
-              .filter(t => t.balance > 0);
-            console.log("✅ DCV tokens:", ownedTokens);
-            setDcvTokens(ownedTokens);
-          } catch (dcvError) {
-            console.warn("⚠️ DCV token fetch failed:", dcvError.message);
-            setDcvTokens([]);
-          }
-        } else {
-          console.log("⏭️ Skipping DCV tokens (no wallet or token address)");
-          setDcvTokens([]);
-        }
-        // --- End DCV Token Section ---
-
-        console.log("✅ All data fetched successfully!");
+        // Wait for all dashboard data to complete (but don't fail if some fail)
+        await Promise.allSettled(dashboardPromises);
 
       } catch (err) {
-        console.error("❌ Error fetching data:", err);
-        setError("Failed to fetch data from blockchain: " + (err.reason || err.message || err.toString()));
+        console.error("❌ Dashboard fetch error:", err);
+        setError("Failed to fetch dashboard data: " + err.message);
       } finally {
         setLoading(false);
       }
     };
+
     fetchData();
   }, [aadhaar]);
 
@@ -473,16 +442,45 @@ export default function ConsumerDashboard() {
       <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
         <div className="text-sm text-green-800">
           {(() => {
+            // Prioritize blockchain profile data over localStorage
+            if (profile && profile.name) {
+              return `Welcome back, ${profile.name}! 👋 (Blockchain verified)`;
+            }
+            
+            // Fallback to localStorage if profile not loaded yet
             try {
               const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
               if (currentUser.data && currentUser.data.name) {
-                return `Welcome back, ${currentUser.data.name}! 👋`;
+                return `Welcome back, ${currentUser.data.name}! 👋 (Loading blockchain data...)`;
               }
             } catch (error) {
               console.warn("Could not parse user data for welcome message");
             }
             return "Welcome to your Dashboard! 👋";
           })()}
+        </div>
+        
+        {/* Debug info to help troubleshoot */}
+        <div className="text-xs text-green-600 mt-2 p-2 bg-green-100 rounded">
+          <strong>Debug Info:</strong><br/>
+          URL Aadhaar: {aadhaar}<br/>
+          Blockchain Profile Loaded: {profile ? 'Yes' : 'No'}<br/>
+          {profile && (
+            <>
+              Blockchain Name: {profile.name}<br/>
+              Blockchain Aadhaar: {profile.aadhaar?.toString()}<br/>
+            </>
+          )}
+          LocalStorage User: {(() => {
+            try {
+              const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
+              return user.data ? `${user.data.name} (${user.data.aadharNumber})` : 'None';
+            } catch {
+              return 'Parse Error';
+            }
+          })()}
+          <br/>
+          <strong className="text-orange-600">💡 Tip:</strong> If showing "Test Consumer", try logging in with Aadhaar: <code className="bg-white px-1">999888777666</code> (blockchain-registered consumer)
         </div>
       </div>
 

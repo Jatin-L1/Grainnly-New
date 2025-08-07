@@ -2,17 +2,17 @@ import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import DeliverySignupRequest from "@/models/DeliverySignupRequest";
 import { ethers } from "ethers";
+import DiamondMergedABI from "../../../../abis/DiamondMergedABI.json";
 
 // Smart contract details
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
-const ABI = require("../../../../abis/DiamondMergedABI.json");
 
 // Function to merge all facet ABIs for Diamond proxy
 function getMergedABI() {
   const mergedABI = [];
-  if (ABI.contracts) {
-    Object.keys(ABI.contracts).forEach(contractName => {
-      const contractData = ABI.contracts[contractName];
+  if (DiamondMergedABI.contracts) {
+    Object.keys(DiamondMergedABI.contracts).forEach(contractName => {
+      const contractData = DiamondMergedABI.contracts[contractName];
       if (contractData.abi && Array.isArray(contractData.abi)) {
         mergedABI.push(...contractData.abi);
       }
