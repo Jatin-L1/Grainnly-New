@@ -15955,6 +15955,170 @@
           }
         ],
         "anonymous": false
+      },
+      {
+        "type": "function",
+        "name": "getTokenBalance",
+        "inputs": [
+          {
+            "name": "account",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "requestDelivery",
+        "inputs": [
+          {
+            "name": "consumerAddress",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "tokenAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "type": "function",
+        "name": "getShopkeeperInventory",
+        "inputs": [
+          {
+            "name": "shopkeeperAddress",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "tokenBalance",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "allocatedTokens",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "remainingTokens",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "getShopkeeperPayments",
+        "inputs": [
+          {
+            "name": "shopkeeperAddress",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "totalPayments",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "pendingPayments",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "lastPaymentDate",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "getShopkeeperDeliveries",
+        "inputs": [
+          {
+            "name": "shopkeeperAddress",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "pendingDeliveries",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "completedDeliveries",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "totalDeliveries",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "getShopkeeperAnalytics",
+        "inputs": [
+          {
+            "name": "shopkeeperAddress",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "tokensDistributed",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "consumersServed",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "avgDeliveryTime",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "satisfactionScore",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "view"
       }
     ]
   }

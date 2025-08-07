@@ -15,9 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 const availableCategories = [
   { value: 'BPL', label: 'Below Poverty Line (BPL)' },
   { value: 'AAY', label: 'Antyodaya Anna Yojana (AAY)' },
-  { value: 'APL', label: 'Above Poverty Line (APL)' },
-  { value: 'PHH', label: 'Priority Household (PHH)' },
-  { value: 'ANNAPURNA', label: 'Annapurna Yojana (ANNAPURNA)' }
+  { value: 'APL', label: 'Above Poverty Line (APL)' }
 ];
 
 export default function ConsumerRequestsPage() {

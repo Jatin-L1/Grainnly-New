@@ -1,57 +1,114 @@
 "use client";
+
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useMetaMask } from "@/components/MetaMaskProvider";
 import { ethers } from "ethers";
-import DiamondMergedABI from "../../../abis/DiamondMergedABI.json";
 import { motion } from "framer-motion";
-import {
-  Package,
-  Users,
-  Truck,
-  DollarSign,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  BarChart3,
-  Calendar,
-  MapPin,
-  Phone,
-  CreditCard,
-  TrendingUp,
-  RefreshCw,
-  Eye,
-  Settings,
-  Bell,
-  Archive,
-  FileText,
-  Activity
-} from "lucide-react";
-
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useMetaMask } from "@/components/MetaMaskProvider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { NotificationPanel } from "@/components/NotificationPanel";
+import { 
+  RefreshCw, 
+  Users, 
+  Package, 
+  CreditCard, 
+  Truck, 
+  TrendingUp,
+  Check,
+  X,
+  AlertTriangle,
+  Calendar,
+  Phone,
+  MapPin,
+  DollarSign
+} from "lucide-react";
+import DiamondMergedABI from "../../../abis/DiamondMergedABI.json";
 
-const DIAMOND_PROXY_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL;
+// Contract configuration - Using the correct contract address from your admin API
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0x3329CA690f619bae73b9f36eb43839892D20045f";
+
+// ABI import helper - Merge all contract ABIs
+function getMergedABI() {
+  try {
+    console.log("📄 DiamondMergedABI structure:", Object.keys(DiamondMergedABI));
+    
+    const mergedABI = [];
+    
+    // Check if we have the contracts structure
+    if (DiamondMergedABI.contracts && typeof DiamondMergedABI.contracts === 'object') {
+      console.log("📄 Found contracts structure, merging all ABIs...");
+      console.log("📄 Available contracts:", Object.keys(DiamondMergedABI.contracts));
+      
+      // Merge ABIs from all contracts
+      Object.keys(DiamondMergedABI.contracts).forEach(contractName => {
+        const contractData = DiamondMergedABI.contracts[contractName];
+        if (contractData.abi && Array.isArray(contractData.abi)) {
+          console.log(`📄 Adding ${contractData.abi.length} functions from ${contractName}`);
+          mergedABI.push(...contractData.abi);
+        }
+      });
+      
+      if (mergedABI.length > 0) {
+        console.log(`📄 Total merged ABI functions: ${mergedABI.length}`);
+        
+        // Check if getShopkeeperDashboard exists
+        const hasShopkeeperDashboard = mergedABI.some(item => 
+          item.type === 'function' && item.name === 'getShopkeeperDashboard'
+        );
+        console.log("📄 getShopkeeperDashboard function found:", hasShopkeeperDashboard);
+        
+        return mergedABI;
+      }
+    }
+    
+    // Fallback checks
+    if (DiamondMergedABI.abi && Array.isArray(DiamondMergedABI.abi)) {
+      console.log("📄 Using DiamondMergedABI.abi as fallback");
+      return DiamondMergedABI.abi;
+    } else if (Array.isArray(DiamondMergedABI)) {
+      console.log("📄 Using DiamondMergedABI as array fallback");
+      return DiamondMergedABI;
+    }
+    
+    throw new Error("Could not find any valid ABI structure in DiamondMergedABI");
+  } catch (error) {
+    console.error('❌ Error loading merged ABI:', error);
+    return [];
+  }
+}
+
+// RPC Provider helper
+function getWorkingProvider() {
+  const providers = [
+    'https://rpc-amoy.polygon.technology/',
+    'https://polygon-amoy-bor-rpc.publicnode.com'
+  ];
+  
+  // Try each provider in sequence
+  for (const rpcUrl of providers) {
+    try {
+      return new ethers.JsonRpcProvider(rpcUrl);
+    } catch (error) {
+      console.warn(`Provider ${rpcUrl} failed:`, error);
+    }
+  }
+  
+  throw new Error('All RPC providers failed');
+}
 
 // Animation variants
 const containerVariants = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
-    transition: { staggerChildren: 0.1 }
+    transition: {
+      staggerChildren: 0.1
+    }
   }
 };
 
@@ -64,537 +121,430 @@ export default function ShopkeeperDashboard() {
   const { connected, account, provider } = useMetaMask();
   const router = useRouter();
 
-  // Core data states
+  // Core states
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   
   // Dashboard data
   const [dashboardData, setDashboardData] = useState(null);
-  const [assignedConsumers, setAssignedConsumers] = useState([]);
-  const [assignedDeliveryAgent, setAssignedDeliveryAgent] = useState(null);
-  const [pendingDeliveries, setPendingDeliveries] = useState([]);
-  const [deliveredTokens, setDeliveredTokens] = useState([]);
-  const [deliveryHistory, setDeliveryHistory] = useState([]);
-  const [performanceMetrics, setPerformanceMetrics] = useState(null);
-  const [paymentDashboard, setPaymentDashboard] = useState(null);
-  const [recentPayments, setRecentPayments] = useState([]);
-  const [pendingPayments, setPendingPayments] = useState([]);
-  const [paymentAnalytics, setPaymentAnalytics] = useState(null);
-  const [currentMonthTokens, setCurrentMonthTokens] = useState([]);
-  
-  // Shopkeeper info
   const [shopkeeperInfo, setShopkeeperInfo] = useState(null);
-  const [shopkeeperAddress, setShopkeeperAddress] = useState("");
+  const [assignedConsumers, setAssignedConsumers] = useState([]);
+  const [inventory, setInventory] = useState(null);
+  const [payments, setPayments] = useState(null);
+  const [deliveries, setDeliveries] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
+  const [contract, setContract] = useState(null);
   
   // UI states
   const [activeTab, setActiveTab] = useState("overview");
   const [refreshing, setRefreshing] = useState(false);
-  const [processingTx, setProcessingTx] = useState(false);
-  const [selectedDeliveries, setSelectedDeliveries] = useState([]);
+  const [selectedConsumerTokens, setSelectedConsumerTokens] = useState(null);
+  const [showTokensModal, setShowTokensModal] = useState(false);
 
-  // Check authentication with proper loading state
+  // Initialize contract and fetch data
   useEffect(() => {
-    const checkAuth = async () => {
-      // First check localStorage for existing user data
-      const storedUser = localStorage.getItem('currentUser');
-      if (storedUser) {
-        try {
-          const userData = JSON.parse(storedUser);
-          if (userData.type === 'shopkeeper') {
-            console.log("✅ Found stored shopkeeper data, proceeding with dashboard");
-            // If we have stored data but no wallet connection yet, wait a bit
-            if (!connected || !account) {
-              console.log("⏳ Waiting for wallet connection...");
-              return; // Don't redirect yet, wait for wallet to connect
-            }
-          }
-        } catch (e) {
-          console.error("Error parsing stored user data:", e);
-          localStorage.removeItem('currentUser');
-        }
-      }
+    const initializeDashboard = async () => {
+      console.log("🚀 Initializing shopkeeper dashboard...");
+      console.log("Connected:", connected, "Account:", account);
       
-      // Only redirect to login if we're sure there's no wallet connection after a reasonable delay
       if (!connected || !account) {
-        // Give MetaMask time to connect (especially on page refresh)
-        setTimeout(() => {
-          if (!connected || !account) {
-            console.log("🚫 No wallet connection found, redirecting to login");
-            localStorage.removeItem('currentUser'); // Clear stale auth data
-            router.push("/login?auth=failed");
-          }
-        }, 2000); // Wait 2 seconds before redirecting
+        console.log("⚠️ Wallet not connected, showing error");
+        setError("Please connect your wallet to access the shopkeeper dashboard");
+        setLoading(false);
         return;
       }
-      
-      // Ensure account is valid before setting it
-      if (account && typeof account === 'string' && account.length > 0) {
-        setShopkeeperAddress(account);
-        await fetchAllData();
-      } else {
-        console.error("Invalid account address:", account);
-        setError("Invalid wallet address detected");
+
+      try {
+        setLoading(true);
+        setError("");
+
+        console.log("🔗 Creating contract connection...");
+        console.log("Contract Address:", CONTRACT_ADDRESS);
+
+        // Get working provider and create contract instance
+        const workingProvider = getWorkingProvider();
+        let signer = null;
+        
+        // Handle MetaMask provider properly
+        if (provider && connected) {
+          try {
+            // Create ethers provider from MetaMask provider
+            const ethersProvider = new ethers.BrowserProvider(provider);
+            signer = await ethersProvider.getSigner();
+            console.log("✅ MetaMask signer created");
+          } catch (signerError) {
+            console.warn("⚠️ Could not get signer from MetaMask:", signerError);
+            signer = null;
+          }
+        }
+        
+        const mergedABI = getMergedABI();
+        console.log("📄 ABI loaded, type:", typeof mergedABI);
+        console.log("📄 ABI is array:", Array.isArray(mergedABI));
+        console.log("📄 ABI length:", mergedABI?.length || 0);
+        
+        if (!Array.isArray(mergedABI) || mergedABI.length === 0) {
+          throw new Error("Invalid ABI: Expected non-empty array, got " + typeof mergedABI);
+        }
+        
+        const contractInstance = new ethers.Contract(
+          CONTRACT_ADDRESS, 
+          mergedABI, 
+          signer || workingProvider
+        );
+        
+        console.log("✅ Contract instance created");
+        setContract(contractInstance);
+
+        // Test contract connection by checking if the address is a valid shopkeeper
+        try {
+          console.log("🧪 Testing contract connection...");
+          await contractInstance.getShopkeeperDashboard(account);
+          console.log("✅ Contract connection successful");
+        } catch (testError) {
+          console.log("⚠️ Contract test failed:", testError.message);
+          if (testError.message.includes("Invalid shopkeeper")) {
+            setError("Your wallet address is not registered as a shopkeeper. Please contact the admin.");
+            setLoading(false);
+            return;
+          }
+        }
+
+        // Fetch all dashboard data
+        await fetchDashboardData(contractInstance, account);
+        
+        setLoading(false);
+        console.log("🎉 Dashboard initialization complete");
+      } catch (err) {
+        console.error("❌ Error initializing dashboard:", err);
+        setError(`Failed to initialize dashboard: ${err.message}`);
+        setLoading(false);
       }
     };
 
-    checkAuth();
-  }, [connected, account, router]);
+    initializeDashboard();
+  }, [connected, account, provider]);
 
-  // Fetch all dashboard data
-  const fetchAllData = async () => {
+  // Fetch dashboard data from blockchain
+  const fetchDashboardData = async (contractInstance, shopkeeperAddress) => {
+    try {
+      console.log("🏪 Fetching dashboard for shopkeeper:", shopkeeperAddress);
+
+      // Fetch shopkeeper dashboard data - returns tuple with specific structure
+      const dashboardResult = await contractInstance.getShopkeeperDashboard(shopkeeperAddress);
+      console.log('📊 Raw Dashboard Result:', dashboardResult);
+      
+      // Parse the returned tuple according to your contract function
+      const dashboardData = {
+        shopkeeperAddress: dashboardResult[0],
+        assignedConsumers: Number(dashboardResult[1]),
+        activeConsumers: Number(dashboardResult[2]),
+        monthlyTokensIssued: Number(dashboardResult[3]),
+        totalTokensIssued: Number(dashboardResult[4]),
+        totalDeliveries: Number(dashboardResult[5]),
+        isActive: dashboardResult[6],
+        registrationTime: Number(dashboardResult[7])
+      };
+      
+      console.log('✅ Parsed Dashboard Data:', dashboardData);
+      setDashboardData(dashboardData);
+
+      // Get shopkeeper information
+      try {
+        const shopkeeperData = await contractInstance.getShopkeeperInfo(shopkeeperAddress);
+        console.log('👨‍💼 Raw Shopkeeper Data:', shopkeeperData);
+        
+        const shopkeeperInfo = {
+          shopkeeperAddress: shopkeeperData[0],
+          name: shopkeeperData[1] || "Shopkeeper",
+          area: shopkeeperData[2] || "Area Not Set",
+          registrationTime: Number(shopkeeperData[3]) || 0,
+          totalConsumersAssigned: Number(shopkeeperData[4]) || 0,
+          totalTokensIssued: Number(shopkeeperData[5]) || 0,
+          totalDeliveries: Number(shopkeeperData[6]) || 0,
+          isActive: Boolean(shopkeeperData[7]) || false
+        };
+        setShopkeeperInfo(shopkeeperInfo);
+        console.log('👨‍💼 Parsed Shopkeeper Info:', shopkeeperInfo);
+      } catch (err) {
+        // Use wallet address as fallback if no shopkeeper details available
+        console.log('⚠️ Shopkeeper details not available, using wallet address');
+        setShopkeeperInfo({
+          shopkeeperAddress: account,
+          name: "Shopkeeper " + account.slice(-4).toUpperCase(),
+          area: "Area Not Set",
+          registrationTime: 0,
+          totalConsumersAssigned: 0,
+          totalTokensIssued: 0,
+          totalDeliveries: 0,
+          isActive: true
+        });
+      }
+
+      // Fetch assigned consumers list
+      try {
+        const consumers = await contractInstance.getConsumersByShopkeeper(shopkeeperAddress);
+        console.log('👥 Assigned Consumers:', consumers);
+        setAssignedConsumers(consumers || []);
+      } catch (err) {
+        console.log('⚠️ Consumers function not available:', err);
+        setAssignedConsumers([]);
+      }
+
+      // Fetch unclaimed tokens for this shopkeeper
+      try {
+        const unclaimedTokens = await contractInstance.getUnclaimedTokensByShopkeeper(shopkeeperAddress);
+        console.log('🎫 Unclaimed Tokens:', unclaimedTokens);
+        setInventory({ unclaimedTokens: unclaimedTokens || [] });
+      } catch (err) {
+        console.log('⚠️ Unclaimed tokens function not available:', err);
+      }
+
+      // Set basic metrics for payments and deliveries from dashboard data
+      setPayments({
+        totalPayments: dashboardData.totalTokensIssued,
+        monthlyPayments: dashboardData.monthlyTokensIssued
+      });
+
+      setDeliveries({
+        totalDeliveries: dashboardData.totalDeliveries,
+        pendingDeliveries: dashboardData.assignedConsumers - dashboardData.totalDeliveries
+      });
+
+      setAnalytics({
+        claimRate: dashboardData.assignedConsumers > 0 ? 
+          (dashboardData.totalDeliveries / dashboardData.assignedConsumers * 100).toFixed(1) : 0,
+        activeRate: dashboardData.assignedConsumers > 0 ? 
+          (dashboardData.activeConsumers / dashboardData.assignedConsumers * 100).toFixed(1) : 0
+      });
+
+    } catch (error) {
+      console.error('❌ Error fetching dashboard data:', error);
+      throw new Error(`Failed to fetch dashboard data: ${error.message}`);
+    }
+  };
+
+  // Refresh dashboard data
+  const refreshDashboard = async () => {
+    if (!contract) return;
+    
+    setRefreshing(true);
+    try {
+      await fetchDashboardData(contract, account);
+      setSuccess("Dashboard refreshed successfully");
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Action functions for Indian PDS workflow
+  const markRationDelivered = async (aadhaar, tokenId) => {
     try {
       setLoading(true);
       setError("");
       
-      const provider = new ethers.JsonRpcProvider(RPC_URL);
-      const contract = new ethers.Contract(DIAMOND_PROXY_ADDRESS, DiamondMergedABI, provider);
+      console.log("🎯 Marking ration delivered for Aadhaar:", aadhaar, "TokenId:", tokenId);
       
-      console.log("🏪 Fetching shopkeeper dashboard data for:", account);
+      if (!connected || !account || !contract) {
+        throw new Error("Wallet not connected or contract not initialized");
+      }
+
+      // First ensure this wallet is registered as shopkeeper
+      console.log("🔍 Ensuring wallet is registered as shopkeeper...");
+      try {
+        const registerResponse = await fetch('/api/admin/register-shopkeeper', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            address: account,
+            name: `Shopkeeper ${account.slice(-4).toUpperCase()}`,
+            area: "Local Area"
+          })
+        });
+        
+        const registerResult = await registerResponse.json();
+        if (registerResult.success || registerResult.alreadyRegistered) {
+          console.log("✅ Shopkeeper registration confirmed");
+        } else {
+          console.warn("⚠️ Shopkeeper registration warning:", registerResult.error);
+        }
+      } catch (regError) {
+        console.warn("⚠️ Shopkeeper registration failed:", regError.message);
+        // Continue anyway - maybe already registered
+      }
+
+      // Get the user's signer (MetaMask) - SHOPKEEPER'S OWN WALLET
+      const ethersProvider = new ethers.BrowserProvider(provider);
+      const signer = await ethersProvider.getSigner();
+      const contractWithSigner = contract.connect(signer);
       
-      // Fetch all data in parallel
-      await Promise.all([
-        fetchDashboardData(contract),
-        fetchConsumers(contract),
-        fetchDeliveryAgent(contract),
-        fetchPendingDeliveries(contract),
-        fetchDeliveredTokens(contract),
-        fetchDeliveryHistory(contract),
-        fetchPerformanceMetrics(contract),
-        fetchPaymentData(contract),
-        fetchCurrentMonthTokens(contract)
-      ]);
+      console.log("📞 Using SHOPKEEPER'S wallet to mark delivery...");
+      console.log("👨‍💼 Shopkeeper address:", account);
       
+      // Try markRationDeliveredByAadhaar with shopkeeper's own wallet
+      let tx;
+      try {
+        tx = await contractWithSigner.markRationDeliveredByAadhaar(
+          BigInt(aadhaar),
+          BigInt(tokenId)
+        );
+        console.log("✅ Used markRationDeliveredByAadhaar with shopkeeper wallet");
+      } catch (firstError) {
+        console.log("⚠️ markRationDeliveredByAadhaar failed:", firstError.message);
+        
+        // Fallback to claimRationByConsumer
+        try {
+          tx = await contractWithSigner.claimRationByConsumer(
+            BigInt(aadhaar),
+            BigInt(tokenId)
+          );
+          console.log("✅ Used claimRationByConsumer with shopkeeper wallet");
+        } catch (secondError) {
+          console.error("❌ Both methods failed:", { firstError: firstError.message, secondError: secondError.message });
+          throw new Error(`Failed to mark delivery: ${firstError.message}. Make sure your wallet is registered as a shopkeeper.`);
+        }
+      }
+      
+      console.log("📝 Transaction sent:", tx.hash);
+      setSuccess("Transaction sent! Waiting for confirmation...");
+      
+      // Wait for confirmation
+      const receipt = await tx.wait();
+      console.log("✅ Transaction confirmed:", receipt.hash);
+      
+      setSuccess("Ration delivery marked successfully!");
+      
+      // Refresh dashboard data
+      if (contract) {
+        await fetchDashboardData(contract, account);
+      }
+      
+      setTimeout(() => setSuccess(""), 3000);
     } catch (error) {
-      console.error("❌ Error fetching dashboard data:", error);
-      setError("Failed to load dashboard data: " + (error.reason || error.message));
+      console.error("❌ Error marking delivery:", error);
+      setError("Failed to mark delivery: " + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Individual fetch functions
-  const fetchDashboardData = async (contract) => {
+  const checkUnclaimedTokens = async (aadhaar) => {
     try {
-      const data = await contract.getShopkeeperDashboard(account);
-      setDashboardData(data);
-      console.log("✅ Dashboard data:", data);
-    } catch (error) {
-      console.log("⚠️ Dashboard data not available");
-    }
-  };
-
-  const fetchConsumers = async (contract) => {
-    try {
-      const consumers = await contract.getConsumersByShopkeeper(account);
-      // Ensure all consumer data is properly formatted
-      const formattedConsumers = consumers.map(consumer => ({
-        ...consumer,
-        walletAddress: consumer.walletAddress || '',
-        name: consumer.name || 'Unknown',
-        aadhaar: consumer.aadhaar || '',
-        mobile: consumer.mobile || '',
-        category: consumer.category || 'Unknown',
-        isActive: consumer.isActive || false,
-        registrationTime: consumer.registrationTime || 0
-      }));
-      setAssignedConsumers(formattedConsumers);
-      console.log("✅ Assigned consumers:", formattedConsumers.length);
-    } catch (error) {
-      console.log("⚠️ Error fetching consumers:", error);
-      setAssignedConsumers([]);
-    }
-  };
-
-  const fetchDeliveryAgent = async (contract) => {
-    try {
-      const [agent, hasAgent] = await contract.getAssignedDeliveryAgent(account);
-      if (hasAgent && agent) {
-        // Ensure all agent data is properly formatted
-        const formattedAgent = {
-          ...agent,
-          agentAddress: agent.agentAddress || '',
-          name: agent.name || 'Unknown',
-          mobile: agent.mobile || '',
-          totalDeliveries: agent.totalDeliveries || 0,
-          registrationTime: agent.registrationTime || 0
-        };
-        setAssignedDeliveryAgent(formattedAgent);
-        console.log("✅ Assigned delivery agent:", formattedAgent.name);
-      }
-    } catch (error) {
-      console.log("⚠️ No delivery agent assigned");
-    }
-  };
-
-  const fetchPendingDeliveries = async (contract) => {
-    try {
-      const [tokenIds, aadhaars, names, amounts, expiryTimes] = await contract.getPendingDeliveriesForShopkeeper(account);
+      console.log("🔍 Checking unclaimed tokens for Aadhaar:", aadhaar);
+      setError(""); // Clear previous errors
       
-      // Ensure all arrays exist and have same length
-      if (!tokenIds || !aadhaars || !names || !amounts || !expiryTimes) {
-        console.log("⚠️ Incomplete delivery data received");
-        setPendingDeliveries([]);
-        return;
-      }
+      // Convert aadhaar to string to avoid BigInt serialization issues
+      const aadhaarString = aadhaar.toString();
       
-      const pending = tokenIds.map((tokenId, index) => ({
-        tokenId: tokenId ? tokenId.toString() : `unknown_${index}`,
-        aadhaar: aadhaars[index] ? aadhaars[index].toString() : '',
-        consumerName: names[index] || 'Unknown Consumer',
-        rationAmount: amounts[index] ? amounts[index].toString() : '0',
-        expiryTime: expiryTimes[index] ? Number(expiryTimes[index]) : 0,
-        status: "pending"
-      }));
-      
-      setPendingDeliveries(pending);
-      console.log("✅ Pending deliveries:", pending.length);
-    } catch (error) {
-      console.log("⚠️ Error fetching pending deliveries:", error);
-      setPendingDeliveries([]);
-    }
-  };
-
-  const fetchDeliveredTokens = async (contract) => {
-    try {
-      const [tokenIds, aadhaars, names, deliveryTimes] = await contract.getDeliveredUnclaimedTokens(account);
-      
-      // Ensure all arrays exist and have same length
-      if (!tokenIds || !aadhaars || !names || !deliveryTimes) {
-        console.log("⚠️ Incomplete delivered tokens data received");
-        setDeliveredTokens([]);
-        return;
-      }
-      
-      const delivered = tokenIds.map((tokenId, index) => ({
-        tokenId: tokenId ? tokenId.toString() : `unknown_${index}`,
-        aadhaar: aadhaars[index] ? aadhaars[index].toString() : '',
-        consumerName: names[index] || 'Unknown Consumer',
-        deliveryTime: deliveryTimes[index] ? Number(deliveryTimes[index]) : 0,
-        status: "delivered"
-      }));
-      
-      setDeliveredTokens(delivered);
-      console.log("✅ Delivered unclaimed tokens:", delivered.length);
-    } catch (error) {
-      console.log("⚠️ Error fetching delivered tokens:", error);
-      setDeliveredTokens([]);
-    }
-  };
-
-  const fetchDeliveryHistory = async (contract) => {
-    try {
-      const history = await contract.getShopkeeperDeliveryHistory(account, 20);
-      // Ensure all history data is properly formatted
-      const formattedHistory = history.map(item => ({
-        ...item,
-        actor: item.actor || '',
-        target: item.target || '',
-        action: item.action || 'Unknown action',
-        details: item.details || '',
-        timestamp: item.timestamp || 0
-      }));
-      setDeliveryHistory(formattedHistory);
-      console.log("✅ Delivery history:", formattedHistory.length);
-    } catch (error) {
-      console.log("⚠️ Error fetching delivery history:", error);
-      setDeliveryHistory([]);
-    }
-  };
-
-  const fetchPerformanceMetrics = async (contract) => {
-    try {
-      const [
-        totalAssigned,
-        activeConsumers,
-        tokensIssued,
-        deliveries,
-        pending,
-        overdue,
-        successRate
-      ] = await contract.getShopkeeperPerformanceMetrics(account);
-      
-      setPerformanceMetrics({
-        totalAssignedConsumers: Number(totalAssigned),
-        activeConsumers: Number(activeConsumers),
-        currentMonthTokensIssued: Number(tokensIssued),
-        currentMonthDeliveries: Number(deliveries),
-        pendingDeliveries: Number(pending),
-        overdueDeliveries: Number(overdue),
-        deliverySuccessRate: Number(successRate)
+      // Make API call to backend instead of direct contract call
+      const response = await fetch('/api/admin/get-unclaimed-tokens', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          aadhaar: aadhaarString
+        })
       });
       
-      console.log("✅ Performance metrics loaded");
-    } catch (error) {
-      console.log("⚠️ Error fetching performance metrics:", error);
-    }
-  };
-
-  const fetchPaymentData = async (contract) => {
-    try {
-      // Payment dashboard
-      const [
-        todayPayments,
-        todayAmount,
-        weeklyPayments,
-        weeklyAmount,
-        monthlyPayments,
-        monthlyAmount,
-        pendingPayments,
-        totalEarnings
-      ] = await contract.getShopkeeperPaymentDashboard(account);
+      const result = await response.json();
+      console.log("🎫 Unclaimed tokens response:", result);
       
-      setPaymentDashboard({
-        todayPayments: Number(todayPayments),
-        todayAmount: ethers.formatEther(todayAmount),
-        weeklyPayments: Number(weeklyPayments),
-        weeklyAmount: ethers.formatEther(weeklyAmount),
-        monthlyPayments: Number(monthlyPayments),
-        monthlyAmount: ethers.formatEther(monthlyAmount),
-        pendingPayments: Number(pendingPayments),
-        totalEarnings: ethers.formatEther(totalEarnings)
-      });
-
-      // Recent payments
-      const [payments, consumerNames, categories] = await contract.getRecentPaymentTransactions(account, 10);
-      const recentPaymentsData = payments.map((payment, index) => ({
-        paymentId: payment.paymentId.toString(),
-        aadhaar: payment.aadhaar.toString(),
-        tokenId: payment.tokenId.toString(),
-        amount: ethers.formatEther(payment.amount),
-        timestamp: Number(payment.timestamp),
-        isVerified: payment.isVerified,
-        consumerName: consumerNames[index],
-        category: categories[index],
-        paymentMethod: payment.paymentMethod
-      }));
-      setRecentPayments(recentPaymentsData);
-
-      // Pending payment actions
-      const [paymentIds, aadhaars, names, amounts, tokenIds] = await contract.getPendingPaymentActions(account);
-      const pendingPaymentsData = paymentIds.map((paymentId, index) => ({
-        paymentId: paymentId.toString(),
-        aadhaar: aadhaars[index].toString(),
-        consumerName: names[index],
-        amount: ethers.formatEther(amounts[index]),
-        tokenId: tokenIds[index].toString()
-      }));
-      setPendingPayments(pendingPaymentsData);
-
-      // Payment analytics
-      const [dailyPayments, dailyAmounts, topCategories, categoryAmounts] = await contract.getPaymentAnalytics(account, 7);
-      setPaymentAnalytics({
-        dailyPayments: dailyPayments.map(Number),
-        dailyAmounts: dailyAmounts.map(amount => ethers.formatEther(amount)),
-        topCategories,
-        categoryAmounts: categoryAmounts.map(amount => ethers.formatEther(amount))
-      });
-
-      console.log("✅ Payment data loaded");
-    } catch (error) {
-      console.log("⚠️ Error fetching payment data:", error);
-    }
-  };
-
-  const fetchCurrentMonthTokens = async (contract) => {
-    try {
-      const [tokenIds, aadhaars, names, categories, amounts] = await contract.getCurrentMonthPendingTokens(account);
-      
-      // Ensure all arrays exist and have same length
-      if (!tokenIds || !aadhaars || !names || !categories || !amounts) {
-        console.log("⚠️ Incomplete current month tokens data received");
-        setCurrentMonthTokens([]);
-        return;
+      if (result.success && result.tokens && result.tokens.length > 0) {
+        // Store tokens for display
+        setSelectedConsumerTokens({
+          aadhaar: aadhaarString,
+          tokens: result.tokens
+        });
+        setShowTokensModal(true);
+        
+        setSuccess(`Found ${result.tokens.length} unclaimed tokens for consumer with Aadhaar: ${aadhaarString}`);
+        setTimeout(() => setSuccess(""), 5000);
+        return result.tokens;
+      } else {
+        setError("No unclaimed tokens found for this consumer");
+        setTimeout(() => setError(""), 3000);
+        return [];
       }
+    } catch (error) {
+      console.error("❌ Error checking unclaimed tokens:", error);
+      setError("Failed to check tokens: " + error.message);
+      setTimeout(() => setError(""), 3000);
+      return [];
+    }
+  };
+
+  const requestDeliveryAgent = async (consumerAddress) => {
+    try {
+      setLoading(true);
+      setError("");
       
-      const tokens = tokenIds.map((tokenId, index) => ({
-        tokenId: tokenId ? tokenId.toString() : `unknown_${index}`,
-        aadhaar: aadhaars[index] ? aadhaars[index].toString() : '',
-        consumerName: names[index] || 'Unknown Consumer',
-        category: categories[index] || 'Unknown',
-        rationAmount: amounts[index] ? amounts[index].toString() : '0'
-      }));
+      console.log("🚚 Requesting delivery agent for consumer:", consumerAddress);
       
-      setCurrentMonthTokens(tokens);
-      console.log("✅ Current month tokens:", tokens.length);
+      // Use backend API with admin wallet instead of MetaMask
+      const response = await fetch('/api/admin/request-delivery', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          consumerAddress: consumerAddress,
+          tokenAmount: 1,
+          shopkeeperAddress: account
+        })
+      });
+      
+      const result = await response.json();
+      console.log("📝 Delivery request response:", result);
+      
+      if (result.success) {
+        setSuccess("Delivery agent requested successfully!");
+        console.log("✅ Delivery request confirmed:", result.transactionHash);
+        
+        // Refresh dashboard data
+        if (contract) {
+          await fetchDashboardData(contract, account);
+        }
+        
+        setTimeout(() => setSuccess(""), 3000);
+      } else {
+        throw new Error(result.error || "Failed to request delivery");
+      }
     } catch (error) {
-      console.log("⚠️ Error fetching current month tokens:", error);
-      setCurrentMonthTokens([]);
-    }
-  };
-
-  // Mark delivery as completed
-  const markDeliveryComplete = async (aadhaar, tokenId) => {
-    try {
-      setProcessingTx(true);
-      setError("");
-      setSuccess("");
-
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      const contract = new ethers.Contract(DIAMOND_PROXY_ADDRESS, DiamondMergedABI, signer);
-
-      const tx = await contract.markRationDeliveredByAadhaar(aadhaar, tokenId);
-      console.log("📤 Transaction sent:", tx.hash);
-
-      await tx.wait();
-      console.log("✅ Delivery marked complete");
-
-      setSuccess(`Delivery marked as complete for token ${tokenId}`);
-      await fetchAllData(); // Refresh data
-    } catch (error) {
-      console.error("❌ Error marking delivery:", error);
-      setError("Failed to mark delivery: " + (error.reason || error.message));
+      console.error("❌ Error requesting delivery:", error);
+      setError("Failed to request delivery: " + error.message);
     } finally {
-      setProcessingTx(false);
+      setLoading(false);
     }
   };
 
-  // Bulk mark deliveries
-  const bulkMarkDeliveries = async () => {
-    if (selectedDeliveries.length === 0) {
-      setError("Please select deliveries to mark");
-      return;
-    }
-
-    try {
-      setProcessingTx(true);
-      setError("");
-      setSuccess("");
-
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      const contract = new ethers.Contract(DIAMOND_PROXY_ADDRESS, DiamondMergedABI, signer);
-
-      const aadhaars = selectedDeliveries.map(d => d.aadhaar);
-      const tokenIds = selectedDeliveries.map(d => d.tokenId);
-
-      const tx = await contract.bulkMarkDeliveries(aadhaars, tokenIds);
-      console.log("📤 Bulk delivery transaction sent:", tx.hash);
-
-      await tx.wait();
-      console.log("✅ Bulk deliveries marked complete");
-
-      setSuccess(`${selectedDeliveries.length} deliveries marked as complete`);
-      setSelectedDeliveries([]);
-      await fetchAllData(); // Refresh data
-    } catch (error) {
-      console.error("❌ Error bulk marking deliveries:", error);
-      setError("Failed to mark deliveries: " + (error.reason || error.message));
-    } finally {
-      setProcessingTx(false);
-    }
-  };
-
-  // Initiate payment
-  const initiatePayment = async (aadhaar, tokenId, paymentMethod = "UPI") => {
-    try {
-      setProcessingTx(true);
-      setError("");
-      setSuccess("");
-
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      const contract = new ethers.Contract(DIAMOND_PROXY_ADDRESS, DiamondMergedABI, signer);
-
-      const tx = await contract.initiatePayment(aadhaar, tokenId, paymentMethod);
-      console.log("📤 Payment initiation sent:", tx.hash);
-
-      await tx.wait();
-      console.log("✅ Payment initiated");
-
-      setSuccess(`Payment initiated for token ${tokenId}`);
-      await fetchAllData(); // Refresh data
-    } catch (error) {
-      console.error("❌ Error initiating payment:", error);
-      setError("Failed to initiate payment: " + (error.reason || error.message));
-    } finally {
-      setProcessingTx(false);
-    }
-  };
-
-  // Complete payment
-  const completePayment = async (paymentId, upiTransactionId) => {
-    try {
-      setProcessingTx(true);
-      setError("");
-      setSuccess("");
-
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      const contract = new ethers.Contract(DIAMOND_PROXY_ADDRESS, DiamondMergedABI, signer);
-
-      const tx = await contract.completePayment(paymentId, upiTransactionId);
-      console.log("📤 Payment completion sent:", tx.hash);
-
-      await tx.wait();
-      console.log("✅ Payment completed");
-
-      setSuccess(`Payment completed for ID ${paymentId}`);
-      await fetchAllData(); // Refresh data
-    } catch (error) {
-      console.error("❌ Error completing payment:", error);
-      setError("Failed to complete payment: " + (error.reason || error.message));
-    } finally {
-      setProcessingTx(false);
-    }
-  };
-
-  // Helper functions
+  // Utility functions
   const formatDate = (timestamp) => {
-    if (!timestamp || timestamp === 0) return 'Unknown';
-    try {
-      return new Date(timestamp * 1000).toLocaleDateString('en-IN');
-    } catch (e) {
-      return 'Invalid date';
-    }
+    if (!timestamp || timestamp === 0) return "Never";
+    return new Date(Number(timestamp) * 1000).toLocaleDateString();
   };
 
-  const formatTime = (timestamp) => {
-    if (!timestamp || timestamp === 0) return 'Unknown';
-    try {
-      return new Date(timestamp * 1000).toLocaleTimeString('en-IN');
-    } catch (e) {
-      return 'Invalid time';
-    }
-  };
-
-  const getExpiryStatus = (expiryTime) => {
-    const now = Date.now() / 1000;
-    const daysLeft = Math.ceil((expiryTime - now) / 86400);
-    
-    if (daysLeft < 0) return { status: "expired", color: "destructive", text: "Expired" };
-    if (daysLeft <= 2) return { status: "urgent", color: "destructive", text: `${daysLeft} days left` };
-    if (daysLeft <= 5) return { status: "warning", color: "warning", text: `${daysLeft} days left` };
-    return { status: "good", color: "secondary", text: `${daysLeft} days left` };
-  };
-
-  const getCategoryColor = (category) => {
-    switch (category) {
-      case "APL": return "bg-blue-100 text-blue-800";
-      case "BPL": return "bg-green-100 text-green-800";
-      case "AAY": return "bg-purple-100 text-purple-800";
-      default: return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  if (loading || (!connected && !localStorage.getItem('currentUser'))) {
+  if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center">
         <div className="text-center">
-          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-          <p className="text-lg font-medium text-gray-700">Loading Shopkeeper Dashboard...</p>
-          <p className="text-sm text-gray-500 mt-2">
-            {!connected ? "Connecting to wallet..." : "Fetching PDS data from blockchain"}
-          </p>
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-green-600" />
+          <p className="text-gray-600">Loading dashboard...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50">
       <div className="container mx-auto px-4 py-8">
+        
         {/* Header */}
         <motion.div
           variants={containerVariants}
@@ -602,746 +552,601 @@ export default function ShopkeeperDashboard() {
           animate="show"
           className="mb-8"
         >
-          <motion.div variants={itemVariants} className="flex justify-between items-center mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                PDS Shopkeeper Dashboard
-              </h1>
-              <p className="text-gray-600 mt-1">
-                Public Distribution System - Shopkeeper Portal
-              </p>
-              <p className="text-sm text-gray-500">
-                Address: {shopkeeperAddress ? `${shopkeeperAddress.slice(0, 6)}...${shopkeeperAddress.slice(-4)}` : 'Not connected'}
-              </p>
+          <div className="bg-white rounded-lg p-6 shadow-lg border-l-4 border-blue-500">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                  🏪
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">
+                    {shopkeeperInfo?.name || "Shopkeeper Dashboard"}
+                  </h1>
+                  <p className="text-blue-600 font-semibold">
+                    Address: {shopkeeperInfo?.shopkeeperAddress?.slice(0, 10)}...{shopkeeperInfo?.shopkeeperAddress?.slice(-8)}
+                  </p>
+                  <p className="text-gray-600">
+                    Area: {shopkeeperInfo?.area || "Not Set"}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant={shopkeeperInfo?.isActive ? "default" : "secondary"} className="bg-green-100 text-green-800">
+                    {shopkeeperInfo?.isActive ? "Active Shop" : "Inactive"}
+                  </Badge>
+                </div>
+                <p className="text-sm text-gray-600">📍 {shopkeeperInfo?.area}</p>
+                <p className="text-sm text-gray-600">� Consumers: {shopkeeperInfo?.totalConsumersAssigned || 0}</p>
+                <p className="text-sm text-gray-600">🎫 Tokens: {shopkeeperInfo?.totalTokensIssued || 0}</p>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <NotificationPanel 
-                userAddress={account} 
-                userType="shopkeeper" 
-              />
+            <div className="flex gap-4">
               <Button
+                onClick={refreshDashboard}
                 variant="outline"
-                onClick={() => {
-                  setRefreshing(true);
-                  fetchAllData().finally(() => setRefreshing(false));
-                }}
                 disabled={refreshing}
+                className="flex items-center gap-2 border-blue-300 text-blue-600 hover:bg-blue-50"
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
-              <Button variant="outline">
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
-              </Button>
             </div>
-          </motion.div>
-
-          {/* Error/Success Messages */}
-          {error && (
-            <motion.div variants={itemVariants} className="mb-6">
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="flex items-center">
-                  <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
-                  <p className="text-red-800">{error}</p>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {success && (
-            <motion.div variants={itemVariants} className="mb-6">
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="flex items-center">
-                  <CheckCircle2 className="h-5 w-5 text-green-600 mr-2" />
-                  <p className="text-green-800">{success}</p>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Quick Stats */}
-          <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Total Consumers</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {assignedConsumers.length}
-                    </p>
-                  </div>
-                  <Users className="h-8 w-8 text-blue-600" />
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  Active: {performanceMetrics?.activeConsumers || 0}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Pending Deliveries</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {pendingDeliveries.length}
-                    </p>
-                  </div>
-                  <Package className="h-8 w-8 text-amber-600" />
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  Overdue: {performanceMetrics?.overdueDeliveries || 0}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Delivery Agent</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {assignedDeliveryAgent ? "1" : "0"}
-                    </p>
-                  </div>
-                  <Truck className="h-8 w-8 text-green-600" />
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  {assignedDeliveryAgent ? assignedDeliveryAgent.name : "Not assigned"}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Monthly Earnings</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      ₹{paymentDashboard?.monthlyAmount || "0"}
-                    </p>
-                  </div>
-                  <DollarSign className="h-8 w-8 text-purple-600" />
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  {paymentDashboard?.monthlyPayments || 0} transactions
-                </p>
-              </CardContent>
-            </Card>
-          </motion.div>
+          </div>
         </motion.div>
 
-        {/* Main Content Tabs */}
+        {/* Error/Success Messages */}
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {success && (
+          <Alert className="mb-6 bg-green-50 border-green-200">
+            <Check className="h-4 w-4 text-green-600" />
+            <AlertDescription className="text-green-800">{success}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* Dashboard Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="deliveries">Deliveries</TabsTrigger>
             <TabsTrigger value="consumers">Consumers</TabsTrigger>
+            <TabsTrigger value="inventory">Inventory</TabsTrigger>
+            <TabsTrigger value="deliveries">Deliveries</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
-            <TabsTrigger value="history">History</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Performance Metrics */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5" />
-                    Performance Metrics
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {performanceMetrics ? (
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium">Delivery Success Rate</span>
-                        <span className="text-lg font-bold text-green-600">
-                          {performanceMetrics.deliverySuccessRate}%
-                        </span>
+          <TabsContent value="overview">
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              animate="show"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+            >
+              <motion.div variants={itemVariants}>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Assigned Consumers</CardTitle>
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{dashboardData?.assignedConsumers || 0}</div>
+                    <p className="text-xs text-muted-foreground">
+                      Active: {dashboardData?.activeConsumers || 0}
+                    </p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              <motion.div variants={itemVariants}>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Monthly Tokens</CardTitle>
+                    <Package className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {dashboardData?.monthlyTokensIssued || 0}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Issued this month
+                    </p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              <motion.div variants={itemVariants}>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Tokens</CardTitle>
+                    <CreditCard className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {dashboardData?.totalTokensIssued || 0}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Lifetime total
+                    </p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              <motion.div variants={itemVariants}>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Deliveries</CardTitle>
+                    <Truck className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {dashboardData?.totalDeliveries || 0}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Completed deliveries
+                    </p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </motion.div>
+
+            {/* Additional Dashboard Info */}
+            {dashboardData && (
+              <motion.div variants={containerVariants} className="mt-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Shopkeeper Status</CardTitle>
+                    <CardDescription>Your account status and performance metrics</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div>
+                        <label className="text-sm font-medium">Account Status</label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant={dashboardData.isActive ? "default" : "secondary"}>
+                            {dashboardData.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                        </div>
                       </div>
-                      <Progress value={performanceMetrics.deliverySuccessRate} className="h-2" />
-                      
-                      <Separator />
-                      
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-gray-600">Tokens Issued</p>
-                          <p className="font-semibold">{performanceMetrics.currentMonthTokensIssued}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-600">Deliveries Made</p>
-                          <p className="font-semibold">{performanceMetrics.currentMonthDeliveries}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-600">Pending</p>
-                          <p className="font-semibold text-amber-600">{performanceMetrics.pendingDeliveries}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-600">Overdue</p>
-                          <p className="font-semibold text-red-600">{performanceMetrics.overdueDeliveries}</p>
-                        </div>
+                      <div>
+                        <label className="text-sm font-medium">Registration Date</label>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {formatDate(dashboardData.registrationTime)}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Performance Rate</label>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {analytics?.claimRate || 0}% claim rate
+                        </p>
                       </div>
                     </div>
-                  ) : (
-                    <p className="text-gray-500">Performance data not available</p>
-                  )}
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+          </TabsContent>
 
-              {/* Current Month Tokens */}
+          {/* Consumers Tab */}
+          <TabsContent value="consumers">
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              animate="show"
+              className="space-y-6"
+            >
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5" />
-                    Current Month Tokens
-                  </CardTitle>
+                  <CardTitle>Assigned Consumers</CardTitle>
                   <CardDescription>
-                    Tokens issued for current month requiring delivery
+                    Manage your assigned consumers and their ration distribution. 
+                    Total: {dashboardData?.assignedConsumers || 0} | 
+                    Active: {dashboardData?.activeConsumers || 0}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3 max-h-64 overflow-y-auto">
-                    {currentMonthTokens.length > 0 ? (
-                      currentMonthTokens.map((token, index) => (
-                        <div key={index} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                          <div>
-                            <p className="font-medium text-sm">{token.consumerName}</p>
-                            <p className="text-xs text-gray-600">Token: {token.tokenId}</p>
-                          </div>
-                          <div className="text-right">
-                            <Badge variant="outline" className={getCategoryColor(token.category)}>
-                              {token.category}
-                            </Badge>
-                            <p className="text-xs text-gray-600 mt-1">{token.rationAmount} kg</p>
-                          </div>
-                        </div>
-                      ))
+                  <div className="space-y-4">
+                    {!assignedConsumers || assignedConsumers.length === 0 ? (
+                      <div className="text-center py-8">
+                        <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-500">No consumers assigned yet</p>
+                        <p className="text-sm text-gray-400">
+                          Contact admin to get consumers assigned to your shop
+                        </p>
+                      </div>
                     ) : (
-                      <p className="text-gray-500 text-center py-4">No tokens for current month</p>
+                      assignedConsumers.map((consumer, index) => (
+                        <motion.div
+                          key={consumer.aadhaar || consumer.walletAddress || index}
+                          variants={itemVariants}
+                          className="flex items-center justify-between p-4 border rounded-lg bg-white shadow-sm"
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h3 className="font-medium text-gray-900">
+                                {consumer.name || `Consumer ${index + 1}`}
+                              </h3>
+                              <Badge variant={consumer.isActive ? "default" : "secondary"}>
+                                {consumer.isActive ? "Active" : "Inactive"}
+                              </Badge>
+                              {consumer.category && (
+                                <Badge variant="outline">
+                                  {consumer.category}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="text-sm text-gray-600 space-y-1">
+                              {consumer.mobile && (
+                                <p><Phone className="inline h-3 w-3 mr-1" />{consumer.mobile}</p>
+                              )}
+                              {consumer.aadhaar && (
+                                <p>Aadhaar: {consumer.aadhaar}</p>
+                              )}
+                              {consumer.walletAddress && (
+                                <p className="font-mono text-xs">
+                                  Wallet: {consumer.walletAddress.slice(0, 10)}...{consumer.walletAddress.slice(-8)}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-2 ml-4">
+                            <Button
+                              size="sm"
+                              onClick={async () => {
+                                if (consumer.aadhaar) {
+                                  // First check for unclaimed tokens
+                                  const tokens = await checkUnclaimedTokens(consumer.aadhaar);
+                                  if (tokens && tokens.length > 0) {
+                                    // Use the first available token
+                                    const tokenToDeliver = tokens[0];
+                                    console.log("📦 Delivering token:", tokenToDeliver);
+                                    
+                                    // Extract token ID (adjust based on your token structure)
+                                    const tokenId = tokenToDeliver.tokenId || tokenToDeliver.id || tokenToDeliver;
+                                    await markRationDelivered(consumer.aadhaar, tokenId);
+                                  } else {
+                                    setError("No unclaimed tokens found for this consumer");
+                                  }
+                                } else {
+                                  setError("Consumer Aadhaar number not available");
+                                }
+                              }}
+                              disabled={!consumer.isActive || !consumer.aadhaar || loading}
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              ✓ Mark Delivered
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                if (consumer.walletAddress) {
+                                  requestDeliveryAgent(consumer.walletAddress);
+                                } else {
+                                  setError("Consumer wallet address not available");
+                                }
+                              }}
+                              disabled={!consumer.walletAddress || loading}
+                            >
+                              🚚 Request Delivery
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={async () => {
+                                if (consumer.aadhaar) {
+                                  const tokens = await checkUnclaimedTokens(consumer.aadhaar);
+                                  if (tokens.length > 0) {
+                                    setSuccess(`Found ${tokens.length} unclaimed tokens for this consumer`);
+                                  } else {
+                                    setError("No unclaimed tokens found");
+                                  }
+                                }
+                              }}
+                              disabled={!consumer.aadhaar}
+                            >
+                              🔍 Check Tokens
+                            </Button>
+                          </div>
+                        </motion.div>
+                      ))
+                    )}
+                  </div>
+                  
+                  {dashboardData && (
+                    <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                      <h4 className="font-medium text-blue-900 mb-2">Quick Stats</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <span className="text-blue-600">Total Assigned:</span>
+                          <p className="font-bold text-blue-900">{dashboardData.assignedConsumers}</p>
+                        </div>
+                        <div>
+                          <span className="text-blue-600">Active:</span>
+                          <p className="font-bold text-blue-900">{dashboardData.activeConsumers}</p>
+                        </div>
+                        <div>
+                          <span className="text-blue-600">Monthly Tokens:</span>
+                          <p className="font-bold text-blue-900">{dashboardData.monthlyTokensIssued}</p>
+                        </div>
+                        <div>
+                          <span className="text-blue-600">Completion Rate:</span>
+                          <p className="font-bold text-blue-900">
+                            {dashboardData.assignedConsumers > 0 ? 
+                              Math.round((dashboardData.totalDeliveries / dashboardData.assignedConsumers) * 100) : 0}%
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          </TabsContent>
+
+          {/* Inventory Tab */}
+          <TabsContent value="inventory">
+            <motion.div variants={containerVariants} initial="hidden" animate="show">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Token Inventory</CardTitle>
+                  <CardDescription>Track DCVTokens and ration distribution for your assigned consumers</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="p-4 bg-green-50 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Package className="h-5 w-5 text-green-600" />
+                          <span className="font-medium text-green-900">Monthly Tokens</span>
+                        </div>
+                        <p className="text-2xl font-bold text-green-600">
+                          {dashboardData?.monthlyTokensIssued || 0}
+                        </p>
+                        <p className="text-sm text-green-700">Issued this month</p>
+                      </div>
+                      
+                      <div className="p-4 bg-blue-50 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <CreditCard className="h-5 w-5 text-blue-600" />
+                          <span className="font-medium text-blue-900">Total Tokens</span>
+                        </div>
+                        <p className="text-2xl font-bold text-blue-600">
+                          {dashboardData?.totalTokensIssued || 0}
+                        </p>
+                        <p className="text-sm text-blue-700">Lifetime total</p>
+                      </div>
+                      
+                      <div className="p-4 bg-orange-50 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Truck className="h-5 w-5 text-orange-600" />
+                          <span className="font-medium text-orange-900">Delivered</span>
+                        </div>
+                        <p className="text-2xl font-bold text-orange-600">
+                          {dashboardData?.totalDeliveries || 0}
+                        </p>
+                        <p className="text-sm text-orange-700">Completed deliveries</p>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div>
+                      <h4 className="font-medium mb-4">Unclaimed Tokens</h4>
+                      {inventory?.unclaimedTokens && inventory.unclaimedTokens.length > 0 ? (
+                        <div className="space-y-2">
+                          {inventory.unclaimedTokens.slice(0, 5).map((token, index) => (
+                            <div key={index} className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
+                              <div>
+                                <span className="font-medium">Token #{token.tokenId}</span>
+                                <p className="text-sm text-gray-600">Aadhaar: {token.aadhaar}</p>
+                              </div>
+                              <Badge variant="outline" className="text-yellow-700 border-yellow-300">
+                                Pending
+                              </Badge>
+                            </div>
+                          ))}
+                          {inventory.unclaimedTokens.length > 5 && (
+                            <p className="text-sm text-gray-500 text-center">
+                              +{inventory.unclaimedTokens.length - 5} more unclaimed tokens
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-center py-6">
+                          <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                          <p className="text-gray-500">No unclaimed tokens found</p>
+                          <p className="text-sm text-gray-400">All tokens have been claimed or delivered</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {dashboardData && (
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <h4 className="font-medium text-gray-900 mb-2">Distribution Efficiency</h4>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600">Claim Rate</span>
+                            <span className="text-sm font-medium">
+                              {dashboardData.assignedConsumers > 0 ? 
+                                Math.round((dashboardData.totalDeliveries / dashboardData.assignedConsumers) * 100) : 0}%
+                            </span>
+                          </div>
+                          <Progress 
+                            value={dashboardData.assignedConsumers > 0 ? 
+                              (dashboardData.totalDeliveries / dashboardData.assignedConsumers) * 100 : 0} 
+                            className="h-2"
+                          />
+                        </div>
+                      </div>
                     )}
                   </div>
                 </CardContent>
               </Card>
-            </div>
+            </motion.div>
+          </TabsContent>
 
-            {/* Recent Activity */}
+          {/* Other tabs would follow similar pattern */}
+          <TabsContent value="deliveries">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5" />
-                  Recent Activity
-                </CardTitle>
+                <CardTitle>Delivery Management</CardTitle>
+                <CardDescription>Track pending and completed deliveries</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {deliveryHistory.length > 0 ? (
-                    deliveryHistory.slice(0, 5).map((activity, index) => (
-                      <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded">
-                        <CheckCircle2 className="h-5 w-5 text-green-600" />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">{activity.action}</p>
-                          <p className="text-xs text-gray-600">
-                            {formatDate(activity.timestamp)} at {formatTime(activity.timestamp)}
-                          </p>
-                        </div>
-                        <Badge variant="outline">Completed</Badge>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-gray-500 text-center py-4">No recent activity</p>
-                  )}
-                </div>
+                <p className="text-center text-gray-500 py-8">Delivery data will be displayed here</p>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* Deliveries Tab */}
-          <TabsContent value="deliveries" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Delivery Management</h2>
-              <div className="flex gap-2">
-                {selectedDeliveries.length > 0 && (
-                  <Button
-                    onClick={bulkMarkDeliveries}
-                    disabled={processingTx}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Mark {selectedDeliveries.length} as Delivered
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {/* Pending Deliveries */}
+          <TabsContent value="payments">
             <Card>
               <CardHeader>
-                <CardTitle>Pending Deliveries</CardTitle>
-                <CardDescription>
-                  Ration tokens waiting for delivery to consumers
-                </CardDescription>
+                <CardTitle>Payment History</CardTitle>
+                <CardDescription>View your earnings and payment history</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {pendingDeliveries.length > 0 ? (
-                    pendingDeliveries.map((delivery, index) => {
-                      const expiryStatus = getExpiryStatus(delivery.expiryTime);
-                      const isSelected = selectedDeliveries.some(d => d.tokenId === delivery.tokenId);
-                      
-                      return (
-                        <div
-                          key={index}
-                          className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                            isSelected ? 'bg-blue-50 border-blue-200' : 'bg-white hover:bg-gray-50'
-                          }`}
-                          onClick={() => {
-                            if (isSelected) {
-                              setSelectedDeliveries(prev => prev.filter(d => d.tokenId !== delivery.tokenId));
-                            } else {
-                              setSelectedDeliveries(prev => [...prev, delivery]);
-                            }
-                          }}
-                        >
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => {}}
-                                  className="rounded"
-                                />
-                                <h4 className="font-medium">{delivery.consumerName}</h4>
-                                <Badge variant="outline">
-                                  Token: {delivery.tokenId}
-                                </Badge>
-                              </div>
-                              <div className="mt-2 flex items-center gap-4 text-sm text-gray-600">
-                                <span>Aadhaar: {delivery.aadhaar ? delivery.aadhaar.toString() : 'Not available'}</span>
-                                <span>Amount: {delivery.rationAmount || 0} kg</span>
-                                <Badge variant={expiryStatus.color}>
-                                  {expiryStatus.text}
-                                </Badge>
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  markDeliveryComplete(delivery.aadhaar, delivery.tokenId);
-                                }}
-                                disabled={processingTx}
-                              >
-                                <CheckCircle2 className="h-4 w-4 mr-1" />
-                                Mark Delivered
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  initiatePayment(delivery.aadhaar, delivery.tokenId);
-                                }}
-                                disabled={processingTx}
-                              >
-                                <CreditCard className="h-4 w-4 mr-1" />
-                                Initiate Payment
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="text-center py-8">
-                      <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-500">No pending deliveries</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Delivered but Unclaimed */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Delivered but Unclaimed</CardTitle>
-                <CardDescription>
-                  Tokens delivered but not yet claimed by consumers
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {deliveredTokens.length > 0 ? (
-                    deliveredTokens.map((token, index) => (
-                      <div key={index} className="p-4 border rounded-lg bg-blue-50">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <h4 className="font-medium">{token.consumerName}</h4>
-                            <div className="mt-1 flex items-center gap-4 text-sm text-gray-600">
-                              <span>Token: {token.tokenId || 'Unknown'}</span>
-                              <span>Aadhaar: {token.aadhaar ? token.aadhaar.toString() : 'Not available'}</span>
-                              <span>Delivered: {token.deliveryTime ? formatDate(token.deliveryTime) : 'Unknown'}</span>
-                            </div>
-                          </div>
-                          <Badge variant="outline" className="bg-blue-100 text-blue-800">
-                            Delivered
-                          </Badge>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-gray-500 text-center py-4">No delivered unclaimed tokens</p>
-                  )}
-                </div>
+                <p className="text-center text-gray-500 py-8">Payment data will be displayed here</p>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* Consumers Tab */}
-          <TabsContent value="consumers" className="space-y-6">
+          <TabsContent value="analytics">
             <Card>
               <CardHeader>
-                <CardTitle>Assigned Consumers</CardTitle>
-                <CardDescription>
-                  List of all consumers assigned to your shop
-                </CardDescription>
+                <CardTitle>Performance Analytics</CardTitle>
+                <CardDescription>Your overall performance metrics</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {assignedConsumers.length > 0 ? (
-                    assignedConsumers.map((consumer, index) => (
-                      <div key={index} className="p-4 border rounded-lg">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <h4 className="font-medium">{consumer.name}</h4>
-                              <Badge variant="outline" className={getCategoryColor(consumer.category)}>
-                                {consumer.category}
-                              </Badge>
-                              {consumer.isActive ? (
-                                <Badge variant="outline" className="bg-green-100 text-green-800">
-                                  Active
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className="bg-red-100 text-red-800">
-                                  Inactive
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                              <div>
-                                <span className="font-medium">Aadhaar:</span> {consumer.aadhaar ? consumer.aadhaar.toString() : 'Not available'}
-                              </div>
-                              <div>
-                                <span className="font-medium">Mobile:</span> {consumer.mobile}
-                              </div>
-                              <div>
-                                <span className="font-medium">Wallet:</span> 
-                                {consumer.walletAddress ? `${consumer.walletAddress.slice(0, 6)}...${consumer.walletAddress.slice(-4)}` : 'Not set'}
-                              </div>
-                              <div>
-                                <span className="font-medium">Registration:</span> 
-                                {formatDate(consumer.registrationTime)}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline">
-                              <Eye className="h-4 w-4 mr-1" />
-                              View Details
-                            </Button>
-                            <Button size="sm" variant="outline">
-                              <Phone className="h-4 w-4 mr-1" />
-                              Contact
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8">
-                      <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-500">No consumers assigned</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Delivery Agent Info */}
-            {assignedDeliveryAgent && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Assigned Delivery Agent</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="p-4 border rounded-lg bg-green-50">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="font-medium">{assignedDeliveryAgent.name}</h4>
-                        <div className="mt-2 grid grid-cols-2 gap-4 text-sm text-gray-600">
-                          <div>
-                            <span className="font-medium">Mobile:</span> {assignedDeliveryAgent.mobile}
-                          </div>
-                          <div>
-                            <span className="font-medium">Total Deliveries:</span> {assignedDeliveryAgent.totalDeliveries.toString()}
-                          </div>
-                          <div>
-                            <span className="font-medium">Address:</span> 
-                            {assignedDeliveryAgent.agentAddress ? `${assignedDeliveryAgent.agentAddress.slice(0, 6)}...${assignedDeliveryAgent.agentAddress.slice(-4)}` : 'Not set'}
-                          </div>
-                          <div>
-                            <span className="font-medium">Registration:</span> 
-                            {formatDate(assignedDeliveryAgent.registrationTime)}
-                          </div>
-                        </div>
-                      </div>
-                      <Badge variant="outline" className="bg-green-100 text-green-800">
-                        Active Agent
-                      </Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          {/* Payments Tab */}
-          <TabsContent value="payments" className="space-y-6">
-            {/* Payment Dashboard */}
-            {paymentDashboard && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="text-center">
-                      <p className="text-sm font-medium text-gray-600">Today's Earnings</p>
-                      <p className="text-2xl font-bold text-green-600">₹{paymentDashboard.todayAmount}</p>
-                      <p className="text-xs text-gray-500">{paymentDashboard.todayPayments} transactions</p>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="text-center">
-                      <p className="text-sm font-medium text-gray-600">Weekly Earnings</p>
-                      <p className="text-2xl font-bold text-blue-600">₹{paymentDashboard.weeklyAmount}</p>
-                      <p className="text-xs text-gray-500">{paymentDashboard.weeklyPayments} transactions</p>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="text-center">
-                      <p className="text-sm font-medium text-gray-600">Total Earnings</p>
-                      <p className="text-2xl font-bold text-purple-600">₹{paymentDashboard.totalEarnings}</p>
-                      <p className="text-xs text-gray-500">All time</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-
-            {/* Pending Payment Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Pending Payment Actions</CardTitle>
-                <CardDescription>
-                  Payments requiring completion or action
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {pendingPayments.length > 0 ? (
-                    pendingPayments.map((payment, index) => (
-                      <div key={index} className="p-4 border rounded-lg bg-amber-50">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <h4 className="font-medium">{payment.consumerName}</h4>
-                            <div className="mt-1 flex items-center gap-4 text-sm text-gray-600">
-                              <span>Payment ID: {payment.paymentId}</span>
-                              <span>Amount: ₹{payment.amount}</span>
-                              <span>Token: {payment.tokenId}</span>
-                            </div>
-                          </div>
-                          <Button
-                            size="sm"
-                            onClick={() => completePayment(payment.paymentId, "UPI_" + Date.now())}
-                            disabled={processingTx}
-                          >
-                            Complete Payment
-                          </Button>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-gray-500 text-center py-4">No pending payment actions</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Recent Payments */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Payment Transactions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {recentPayments.length > 0 ? (
-                    recentPayments.map((payment, index) => (
-                      <div key={index} className="p-4 border rounded-lg">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <h4 className="font-medium">{payment.consumerName}</h4>
-                            <div className="mt-1 flex items-center gap-4 text-sm text-gray-600">
-                              <span>₹{payment.amount}</span>
-                              <span>{payment.paymentMethod}</span>
-                              <span>{formatDate(payment.timestamp)}</span>
-                            </div>
-                          </div>
-                          <Badge
-                            variant="outline"
-                            className={payment.isVerified 
-                              ? "bg-green-100 text-green-800" 
-                              : "bg-yellow-100 text-yellow-800"
-                            }
-                          >
-                            {payment.isVerified ? "Verified" : "Pending"}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-gray-500 text-center py-4">No recent payments</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Analytics Tab */}
-          <TabsContent value="analytics" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Payment Analytics</CardTitle>
-                <CardDescription>
-                  Payment trends and category breakdown for the last 7 days
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {paymentAnalytics ? (
-                  <div className="space-y-6">
-                    {/* Daily Payment Chart Placeholder */}
-                    <div>
-                      <h4 className="font-medium mb-3">Daily Payment Trends</h4>
-                      <div className="grid grid-cols-7 gap-2 h-32">
-                        {paymentAnalytics.dailyAmounts.map((amount, index) => {
-                          const maxAmount = Math.max(...paymentAnalytics.dailyAmounts.map(a => parseFloat(a)));
-                          const height = maxAmount > 0 ? (parseFloat(amount) / maxAmount) * 100 : 0;
-                          
-                          return (
-                            <div key={index} className="flex flex-col items-center">
-                              <div
-                                className="bg-blue-500 w-full rounded-t"
-                                style={{ height: `${height}%` }}
-                              ></div>
-                              <div className="text-xs text-gray-600 mt-1">
-                                Day {index + 1}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    
-                    <Separator />
-                    
-                    {/* Category Breakdown */}
-                    <div>
-                      <h4 className="font-medium mb-3">Category Breakdown</h4>
-                      <div className="space-y-3">
-                        {paymentAnalytics.topCategories.map((category, index) => {
-                          const amount = parseFloat(paymentAnalytics.categoryAmounts[index]);
-                          const totalAmount = paymentAnalytics.categoryAmounts.reduce((sum, amt) => sum + parseFloat(amt), 0);
-                          const percentage = totalAmount > 0 ? (amount / totalAmount) * 100 : 0;
-                          
-                          return (
-                            <div key={index} className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline" className={getCategoryColor(category)}>
-                                  {category}
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <div className="w-24">
-                                  <Progress value={percentage} className="h-2" />
-                                </div>
-                                <span className="text-sm font-medium">₹{amount.toFixed(2)}</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-gray-500 text-center py-8">Analytics data not available</p>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* History Tab */}
-          <TabsContent value="history" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Delivery History</CardTitle>
-                <CardDescription>
-                  Complete history of all deliveries made
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {deliveryHistory.length > 0 ? (
-                    deliveryHistory.map((delivery, index) => (
-                      <div key={index} className="p-4 border rounded-lg">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <h4 className="font-medium">{delivery.action}</h4>
-                            <div className="mt-1 flex items-center gap-4 text-sm text-gray-600">
-                              <span>Actor: {delivery.actor ? `${delivery.actor.slice(0, 6)}...${delivery.actor.slice(-4)}` : 'Unknown'}</span>
-                              <span>Target: {delivery.target ? `${delivery.target.slice(0, 6)}...${delivery.target.slice(-4)}` : 'Unknown'}</span>
-                              <span>{formatDate(delivery.timestamp)} at {formatTime(delivery.timestamp)}</span>
-                            </div>
-                            {delivery.details && (
-                              <p className="text-sm text-gray-600 mt-1">{delivery.details}</p>
-                            )}
-                          </div>
-                          <Badge variant="outline" className="bg-green-100 text-green-800">
-                            Completed
-                          </Badge>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8">
-                      <Archive className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-500">No delivery history available</p>
-                    </div>
-                  )}
-                </div>
+                <p className="text-center text-gray-500 py-8">Analytics data will be displayed here</p>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Tokens Modal */}
+        {showTokensModal && selectedConsumerTokens && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-5xl w-full max-h-[80vh] overflow-y-auto mx-4">
+              <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-200">
+                <div>
+                  <h3 className="text-xl font-bold">
+                    Token Details for Consumer
+                  </h3>
+                  <p className="text-gray-600">Aadhaar: {selectedConsumerTokens.aadhaar}</p>
+                </div>
+                <button
+                  onClick={() => setShowTokensModal(false)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100"
+                >
+                  ×
+                </button>
+              </div>
+              
+              <div className="overflow-x-auto">
+                <table className="min-w-full border-collapse border border-gray-300">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="border border-gray-300 px-3 py-2 text-left">Token ID</th>
+                      <th className="border border-gray-300 px-3 py-2 text-left">Ration Amount</th>
+                      <th className="border border-gray-300 px-3 py-2 text-left">Category</th>
+                      <th className="border border-gray-300 px-3 py-2 text-left">Issued Date</th>
+                      <th className="border border-gray-300 px-3 py-2 text-left">Expiry Date</th>
+                      <th className="border border-gray-300 px-3 py-2 text-left">Status</th>
+                      <th className="border border-gray-300 px-3 py-2 text-left">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedConsumerTokens.tokens.map((token) => {
+                      const issuedDate = new Date(token.issuedTime * 1000).toLocaleDateString();
+                      const expiryDate = new Date(token.expiryTime * 1000).toLocaleDateString();
+                      const isExpired = token.isExpired || new Date() > new Date(token.expiryTime * 1000);
+                      
+                      return (
+                        <tr key={token.tokenId} className="hover:bg-gray-50">
+                          <td className="border border-gray-300 px-3 py-3 font-mono text-center">
+                            <Badge variant="outline">
+                              #{token.tokenId}
+                            </Badge>
+                          </td>
+                          <td className="border border-gray-300 px-3 py-3 text-center font-semibold">
+                            {token.rationAmount} kg
+                          </td>
+                          <td className="border border-gray-300 px-3 py-3 text-center">
+                            <Badge variant="secondary">
+                              {token.category || 'Standard'}
+                            </Badge>
+                          </td>
+                          <td className="border border-gray-300 px-3 py-3 text-center">
+                            {issuedDate}
+                          </td>
+                          <td className="border border-gray-300 px-3 py-3 text-center">
+                            {expiryDate}
+                          </td>
+                          <td className="border border-gray-300 px-3 py-3 text-center">
+                            <Badge 
+                              variant={
+                                token.isClaimed ? "default" : 
+                                isExpired ? "destructive" : 
+                                "secondary"
+                              }
+                            >
+                              {token.isClaimed ? 'Delivered' : 
+                               isExpired ? 'Expired' : 
+                               'Available'}
+                            </Badge>
+                          </td>
+                          <td className="border border-gray-300 px-3 py-3 text-center">
+                            {!token.isClaimed && !isExpired && (
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  markRationDelivered(selectedConsumerTokens.aadhaar, token.tokenId);
+                                  setShowTokensModal(false);
+                                }}
+                                className="bg-green-600 hover:bg-green-700 text-white text-xs"
+                              >
+                                Mark Delivered
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              
+              <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                <h4 className="font-semibold text-blue-800 mb-2">Summary</h4>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div className="text-center">
+                    <p className="text-blue-600 font-medium">Total Tokens</p>
+                    <p className="font-bold text-blue-900 text-lg">{selectedConsumerTokens.tokens.length}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-green-600 font-medium">Available</p>
+                    <p className="font-bold text-green-900 text-lg">
+                      {selectedConsumerTokens.tokens.filter(t => !t.isClaimed && !t.isExpired).length}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-red-600 font-medium">Expired</p>
+                    <p className="font-bold text-red-900 text-lg">
+                      {selectedConsumerTokens.tokens.filter(t => t.isExpired).length}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
