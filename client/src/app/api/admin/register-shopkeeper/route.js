@@ -6,6 +6,68 @@ const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL;
 const DIAMOND_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
 const ADMIN_PRIVATE_KEY = process.env.ADMIN_PRIVATE_KEY;
 
+// Helper function to extract ABI from the JSON structure
+function getMergedABI() {
+  try {
+    console.log('📄 Processing DiamondMergedABI structure...');
+    console.log('📄 DiamondMergedABI keys:', Object.keys(DiamondMergedABI));
+    
+    // Check if the ABI is already in the correct format (array)
+    if (Array.isArray(DiamondMergedABI)) {
+      console.log('✅ ABI is already an array with', DiamondMergedABI.length, 'functions');
+      return DiamondMergedABI;
+    }
+    
+    const mergedABI = [];
+    
+    // First try: abiMap structure (most likely for our Diamond pattern)
+    if (DiamondMergedABI.abiMap && typeof DiamondMergedABI.abiMap === 'object') {
+      console.log('📦 Using abiMap structure...');
+      console.log('📦 abiMap contracts:', Object.keys(DiamondMergedABI.abiMap));
+      
+      Object.keys(DiamondMergedABI.abiMap).forEach(contractName => {
+        const abi = DiamondMergedABI.abiMap[contractName];
+        if (Array.isArray(abi)) {
+          console.log(`📄 Adding ${abi.length} functions from abiMap.${contractName}`);
+          mergedABI.push(...abi);
+        }
+      });
+    }
+    
+    // Second try: contracts structure (if abiMap fails)
+    if (mergedABI.length === 0 && DiamondMergedABI.contracts && typeof DiamondMergedABI.contracts === 'object') {
+      console.log('📦 Fallback to contracts structure...');
+      console.log('📦 Found contracts:', Object.keys(DiamondMergedABI.contracts));
+      
+      Object.keys(DiamondMergedABI.contracts).forEach(contractName => {
+        const contractData = DiamondMergedABI.contracts[contractName];
+        if (contractData && contractData.abi && Array.isArray(contractData.abi)) {
+          console.log(`📄 Adding ${contractData.abi.length} functions from ${contractName}`);
+          mergedABI.push(...contractData.abi);
+        }
+      });
+    }
+    
+    if (mergedABI.length > 0) {
+      console.log('✅ Merged ABI created with', mergedABI.length, 'total functions');
+      
+      // Log available function names for debugging
+      const functionNames = mergedABI
+        .filter(item => item.type === 'function')
+        .map(item => item.name)
+        .slice(0, 10); // First 10 functions
+      console.log('📋 Available functions (first 10):', functionNames);
+      
+      return mergedABI;
+    }
+    
+    throw new Error('No valid ABI found in DiamondMergedABI.json');
+  } catch (error) {
+    console.error('❌ Error parsing ABI:', error);
+    throw new Error(`ABI parsing failed: ${error.message}`);
+  }
+}
+
 export async function POST(request) {
   try {
     const { address, name, area } = await request.json();
@@ -45,10 +107,14 @@ export async function POST(request) {
     console.log('📍 Diamond Address:', DIAMOND_ADDRESS);
     console.log('📍 RPC URL:', RPC_URL);
 
+    // Get the proper ABI format
+    const mergedABI = getMergedABI();
+    console.log('📄 ABI loaded successfully, functions count:', mergedABI.length);
+
     // Setup provider and signer
     const provider = new ethers.JsonRpcProvider(RPC_URL);
     const wallet = new ethers.Wallet(ADMIN_PRIVATE_KEY, provider);
-    const contract = new ethers.Contract(DIAMOND_ADDRESS, DiamondMergedABI, wallet);
+    const contract = new ethers.Contract(DIAMOND_ADDRESS, mergedABI, wallet);
 
     // Check if shopkeeper is already registered
     try {

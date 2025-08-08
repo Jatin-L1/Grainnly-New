@@ -467,17 +467,20 @@ export default function ShopkeeperDashboard() {
         if (selectedConsumerTokens) {
           console.log("🔄 Refreshing consumer tokens...");
           try {
-            const updatedTokens = await checkUnclaimedTokens(selectedConsumerTokens.aadhaar, true);
+            const includeClaimedTokens = selectedConsumerTokens.includeClaimedTokens || false;
+            const updatedTokens = await checkUnclaimedTokens(selectedConsumerTokens.aadhaar, true, includeClaimedTokens);
             if (updatedTokens && updatedTokens.length === 0) {
               // No more tokens, close modal
               setShowTokensModal(false);
               setSelectedConsumerTokens(null);
-              setSuccess("✅ All tokens delivered! Modal closed.");
+              const tokenType = includeClaimedTokens ? "tokens" : "unclaimed tokens";
+              setSuccess(`✅ All ${tokenType} delivered! Modal closed.`);
             } else if (updatedTokens && updatedTokens.length > 0) {
               // Update the modal with new tokens
               setSelectedConsumerTokens({
                 aadhaar: selectedConsumerTokens.aadhaar,
-                tokens: updatedTokens
+                tokens: updatedTokens,
+                includeClaimedTokens: includeClaimedTokens
               });
               setSuccess(`✅ Delivery marked! ${updatedTokens.length} tokens remaining.`);
             }
@@ -496,50 +499,59 @@ export default function ShopkeeperDashboard() {
     }
   };
 
-  const checkUnclaimedTokens = async (aadhaar, skipModalDisplay = false) => {
+  const checkUnclaimedTokens = async (aadhaar, skipModalDisplay = false, includeClaimedTokens = false) => {
     try {
-      console.log("🔍 Checking unclaimed tokens for Aadhaar:", aadhaar);
+      console.log(`🔍 Checking tokens for Aadhaar: ${aadhaar}, Include claimed: ${includeClaimedTokens}`);
       setError(""); // Clear previous errors
       
       // Convert aadhaar to string to avoid BigInt serialization issues
       const aadhaarString = aadhaar.toString();
       
-      // Make API call to backend instead of direct contract call
+      // Make API call to backend
       const response = await fetch('/api/admin/get-unclaimed-tokens', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          aadhaar: aadhaarString
+          aadhaar: aadhaarString,
+          includeClaimedTokens: includeClaimedTokens
         })
       });
       
+      // Check if response is ok before parsing JSON
+      if (!response.ok) {
+        throw new Error(`API request failed with status: ${response.status}`);
+      }
+      
       const result = await response.json();
-      console.log("🎫 Unclaimed tokens response:", result);
+      console.log("🎫 Tokens response:", result);
       
       if (result.success && result.tokens && result.tokens.length > 0) {
         if (!skipModalDisplay) {
           // Store tokens for display
           setSelectedConsumerTokens({
             aadhaar: aadhaarString,
-            tokens: result.tokens
+            tokens: result.tokens,
+            includeClaimedTokens: includeClaimedTokens
           });
           setShowTokensModal(true);
           
-          setSuccess(`Found ${result.tokens.length} unclaimed tokens for consumer with Aadhaar: ${aadhaarString}`);
+          const tokenTypeText = includeClaimedTokens ? "tokens (claimed + unclaimed)" : "unclaimed tokens";
+          setSuccess(`Found ${result.tokens.length} ${tokenTypeText} for consumer with Aadhaar: ${aadhaarString}`);
           setTimeout(() => setSuccess(""), 5000);
         }
         return result.tokens;
       } else {
         if (!skipModalDisplay) {
-          setError("No unclaimed tokens found for this consumer");
+          const tokenTypeText = includeClaimedTokens ? "tokens" : "unclaimed tokens";
+          setError(`No ${tokenTypeText} found for this consumer`);
           setTimeout(() => setError(""), 3000);
         }
         return [];
       }
     } catch (error) {
-      console.error("❌ Error checking unclaimed tokens:", error);
+      console.error("❌ Error checking tokens:", error);
       if (!skipModalDisplay) {
         setError("Failed to check tokens: " + error.message);
         setTimeout(() => setError(""), 3000);
@@ -909,7 +921,7 @@ export default function ShopkeeperDashboard() {
                               variant="ghost"
                               onClick={async () => {
                                 if (consumer.aadhaar) {
-                                  const tokens = await checkUnclaimedTokens(consumer.aadhaar);
+                                  const tokens = await checkUnclaimedTokens(consumer.aadhaar, false, false);
                                   if (tokens.length > 0) {
                                     setSuccess(`Found ${tokens.length} unclaimed tokens for this consumer`);
                                   } else {
@@ -919,7 +931,24 @@ export default function ShopkeeperDashboard() {
                               }}
                               disabled={!consumer.aadhaar}
                             >
-                              🔍 Check Tokens
+                              🔍 Unclaimed Tokens
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={async () => {
+                                if (consumer.aadhaar) {
+                                  const tokens = await checkUnclaimedTokens(consumer.aadhaar, false, true);
+                                  if (tokens.length > 0) {
+                                    setSuccess(`Found ${tokens.length} total tokens (claimed + unclaimed) for this consumer`);
+                                  } else {
+                                    setError("No tokens found");
+                                  }
+                                }
+                              }}
+                              disabled={!consumer.aadhaar}
+                            >
+                              📋 All Tokens
                             </Button>
                           </div>
                         </motion.div>
@@ -1222,13 +1251,16 @@ export default function ShopkeeperDashboard() {
         {/* Tokens Modal */}
         {showTokensModal && selectedConsumerTokens && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-5xl w-full max-h-[80vh] overflow-y-auto mx-4">
+            <div className="bg-white rounded-lg p-6 max-w-6xl w-full max-h-[85vh] overflow-y-auto mx-4">
               <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-200">
                 <div>
                   <h3 className="text-xl font-bold">
-                    Token Details for Consumer
+                    {selectedConsumerTokens.includeClaimedTokens ? 'All Tokens' : 'Unclaimed Tokens'} for Consumer
                   </h3>
                   <p className="text-gray-600">Aadhaar: {selectedConsumerTokens.aadhaar}</p>
+                  <p className="text-sm text-blue-600">
+                    Showing {selectedConsumerTokens.includeClaimedTokens ? 'all tokens (claimed + unclaimed)' : 'unclaimed tokens only'}
+                  </p>
                 </div>
                 <button
                   onClick={() => setShowTokensModal(false)}
@@ -1248,17 +1280,23 @@ export default function ShopkeeperDashboard() {
                       <th className="border border-gray-300 px-3 py-2 text-left">Issued Date</th>
                       <th className="border border-gray-300 px-3 py-2 text-left">Expiry Date</th>
                       <th className="border border-gray-300 px-3 py-2 text-left">Status</th>
+                      <th className="border border-gray-300 px-3 py-2 text-left">Claimed Date</th>
                       <th className="border border-gray-300 px-3 py-2 text-left">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {selectedConsumerTokens.tokens.map((token) => {
-                      const issuedDate = new Date(token.issuedTime * 1000).toLocaleDateString();
-                      const expiryDate = new Date(token.expiryTime * 1000).toLocaleDateString();
+                      const issuedDate = token.issuedDate || new Date(token.issuedTime * 1000).toLocaleDateString();
+                      const expiryDate = token.expiryDate || new Date(token.expiryTime * 1000).toLocaleDateString();
+                      const claimedDate = token.claimedDate || (token.isClaimed && token.claimTime > 0 ? 
+                        new Date(token.claimTime * 1000).toLocaleDateString() : null);
                       const isExpired = token.isExpired || new Date() > new Date(token.expiryTime * 1000);
+                      const status = token.status || (token.isClaimed ? 'Claimed' : (isExpired ? 'Expired' : 'Available'));
                       
                       return (
-                        <tr key={token.tokenId} className="hover:bg-gray-50">
+                        <tr key={token.tokenId} className={`hover:bg-gray-50 ${
+                          token.isClaimed ? 'bg-green-50' : isExpired ? 'bg-red-50' : 'bg-yellow-50'
+                        }`}>
                           <td className="border border-gray-300 px-3 py-3 font-mono text-center">
                             <Badge variant="outline">
                               #{token.tokenId}
@@ -1277,6 +1315,11 @@ export default function ShopkeeperDashboard() {
                           </td>
                           <td className="border border-gray-300 px-3 py-3 text-center">
                             {expiryDate}
+                            {token.daysUntilExpiry !== undefined && token.daysUntilExpiry > 0 && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                ({token.daysUntilExpiry} days left)
+                              </div>
+                            )}
                           </td>
                           <td className="border border-gray-300 px-3 py-3 text-center">
                             <Badge 
@@ -1286,10 +1329,15 @@ export default function ShopkeeperDashboard() {
                                 "secondary"
                               }
                             >
-                              {token.isClaimed ? 'Delivered' : 
-                               isExpired ? 'Expired' : 
-                               'Available'}
+                              {status}
                             </Badge>
+                          </td>
+                          <td className="border border-gray-300 px-3 py-3 text-center">
+                            {claimedDate ? (
+                              <span className="text-green-600 font-medium">{claimedDate}</span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
                           </td>
                           <td className="border border-gray-300 px-3 py-3 text-center">
                             {!token.isClaimed && !isExpired && (
@@ -1304,6 +1352,16 @@ export default function ShopkeeperDashboard() {
                                 Mark Delivered
                               </Button>
                             )}
+                            {token.isClaimed && (
+                              <Badge variant="outline" className="text-green-600 border-green-600">
+                                ✓ Delivered
+                              </Badge>
+                            )}
+                            {isExpired && !token.isClaimed && (
+                              <Badge variant="destructive">
+                                ⚠ Expired
+                              </Badge>
+                            )}
                           </td>
                         </tr>
                       );
@@ -1314,10 +1372,28 @@ export default function ShopkeeperDashboard() {
               
               <div className="mt-4 p-4 bg-blue-50 rounded-lg">
                 <h4 className="font-semibold text-blue-800 mb-2">Summary</h4>
-                <div className="grid grid-cols-3 gap-4 text-sm">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div className="text-center">
                     <p className="text-blue-600 font-medium">Total Tokens</p>
                     <p className="font-bold text-blue-900 text-lg">{selectedConsumerTokens.tokens.length}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-green-600 font-medium">Claimed/Delivered</p>
+                    <p className="font-bold text-green-900 text-lg">
+                      {selectedConsumerTokens.tokens.filter(t => t.isClaimed).length}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-yellow-600 font-medium">Available</p>
+                    <p className="font-bold text-yellow-900 text-lg">
+                      {selectedConsumerTokens.tokens.filter(t => !t.isClaimed && !t.isExpired).length}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-red-600 font-medium">Expired</p>
+                    <p className="font-bold text-red-900 text-lg">
+                      {selectedConsumerTokens.tokens.filter(t => t.isExpired || (!t.isClaimed && new Date() > new Date(t.expiryTime * 1000))).length}
+                    </p>
                   </div>
                   <div className="text-center">
                     <p className="text-green-600 font-medium">Available</p>

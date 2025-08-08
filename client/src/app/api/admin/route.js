@@ -4,6 +4,7 @@ import twilio from 'twilio';
 import dbConnect from '@/lib/mongodb';
 import DeliverySignupRequest from '@/models/DeliverySignupRequest';
 import ShopkeeperSignupRequest from '@/models/ShopkeeperSignupRequest';
+import ConsumerSignupRequest from '@/models/ConsumerSignupRequest';
 import DiamondMergedABI from "../../../../abis/DiamondMergedABI.json";
 
 // Initialize Twilio
@@ -68,27 +69,118 @@ try {
 
   // Add Diamond contract initialization with merged ABI
   function getMergedABI() {
-    const mergedABI = [];
-    if (DiamondMergedABI.contracts) {
-      Object.keys(DiamondMergedABI.contracts).forEach(contractName => {
+    try {
+      console.log('📄 Processing DiamondMergedABI structure...');
+      
+      // Check if the ABI is already in the correct format (array)
+      if (Array.isArray(DiamondMergedABI)) {
+        console.log('✅ ABI is already an array with', DiamondMergedABI.length, 'functions');
+        return DiamondMergedABI;
+      }
+      
+      // Debug the structure
+      console.log('ABI type:', typeof DiamondMergedABI);
+      console.log('Has contracts property:', !!DiamondMergedABI.contracts);
+      
+      if (!DiamondMergedABI.contracts) {
+        console.error('❌ No contracts property found in DiamondMergedABI');
+        throw new Error('Invalid ABI structure: missing contracts property');
+      }
+      
+      // The correct structure is contracts.{ContractName}.abi
+      const mergedABI = [];
+      const contractNames = Object.keys(DiamondMergedABI.contracts);
+      console.log('Found contract names:', contractNames);
+      
+      if (contractNames.length === 0) {
+        throw new Error('No contracts found in ABI structure');
+      }
+      
+      contractNames.forEach(contractName => {
         const contractData = DiamondMergedABI.contracts[contractName];
-        if (contractData.abi && Array.isArray(contractData.abi)) {
+        if (contractData && contractData.abi && Array.isArray(contractData.abi)) {
+          console.log(`📄 Adding ${contractData.abi.length} functions from ${contractName}`);
           mergedABI.push(...contractData.abi);
+        } else {
+          console.log(`⚠️ Skipping ${contractName} - no valid ABI found`);
         }
       });
+      
+      if (mergedABI.length === 0) {
+        throw new Error('No valid ABI functions found after merging');
+      }
+      
+      console.log('✅ Merged ABI created with', mergedABI.length, 'total functions');
+      // Log a few function names for verification
+      const functionNames = mergedABI
+        .filter(item => item.type === 'function')
+        .map(item => item.name)
+        .slice(0, 5);
+      console.log('Sample function names:', functionNames);
+      return mergedABI;
+      
+    } catch (error) {
+      console.error('❌ Error parsing ABI:', error);
+      console.log('❌ ABI structure debug:', {
+        type: typeof DiamondMergedABI,
+        hasContracts: !!DiamondMergedABI?.contracts,
+        contractKeys: DiamondMergedABI?.contracts ? Object.keys(DiamondMergedABI.contracts) : 'none'
+      });
+      throw new Error(`ABI parsing failed: ${error.message}`);
     }
-    return mergedABI;
   }
   
-  diamondContract = new ethers.Contract(
-    CONTRACT_ADDRESS,
-    getMergedABI(),
-    provider
-  );
+  try {
+    const mergedABI = getMergedABI();
+    console.log('✅ ABI merged successfully, creating contract...');
+    
+    diamondContract = new ethers.Contract(
+      CONTRACT_ADDRESS,
+      mergedABI,
+      adminWallet  // Use adminWallet instead of provider for write operations
+    );
 
-  console.log('Blockchain components initialized successfully');
-  console.log('Admin wallet address:', adminWallet.address);
-  console.log('Contract address:', CONTRACT_ADDRESS);
+    // Verify contract interface was created properly
+    if (!diamondContract.interface) {
+      throw new Error('Contract interface not created - ABI may be invalid');
+    }
+
+    if (!diamondContract.interface.functions) {
+      throw new Error('Contract interface.functions is null - ABI structure problem');
+    }
+
+    console.log('✅ Contract interface created successfully');
+    console.log('Contract interface functions count:', Object.keys(diamondContract.interface.functions).length);
+
+    console.log('Blockchain components initialized successfully');
+    console.log('Admin wallet address:', adminWallet.address);
+    console.log('Contract address:', CONTRACT_ADDRESS);
+    console.log('Diamond contract functions available:', mergedABI.length);
+  } catch (contractError) {
+    console.error('❌ Failed to create diamond contract:', contractError);
+    console.log('Falling back to tokenOpsContract for token operations');
+    diamondContract = null; // Set to null so we can check and use fallback
+  }
+  
+  // Only log debugging info if contract was created successfully
+  if (diamondContract && diamondContract.interface && diamondContract.interface.functions) {
+    const contractFunctions = Object.keys(diamondContract.interface.functions);
+    const hasMonthlyTokens = contractFunctions.some(fn => fn.includes('generateMonthlyTokensForAll'));
+    const hasCategoryTokens = contractFunctions.some(fn => fn.includes('generateTokensForCategory'));
+    
+    console.log('generateMonthlyTokensForAll available on contract:', hasMonthlyTokens);
+    console.log('generateTokensForCategory available on contract:', hasCategoryTokens);
+    console.log('Total contract interface functions:', contractFunctions.length);
+  } else {
+    console.log('⚠️ Diamond contract interface not available, will use fallback tokenOpsContract');
+  }
+  
+  // Also verify tokenOpsContract is available as fallback
+  if (tokenOpsContract) {
+    console.log('✅ TokenOpsContract available as fallback');
+  } else {
+    console.log('❌ TokenOpsContract not available');
+  }
   
 } catch (error) {
   console.error('Failed to initialize blockchain components:', error);
@@ -395,6 +487,10 @@ export async function POST(request) {
         return await handleTransferConsumer(body);
       case 'update-consumer-category':
         return await handleUpdateConsumerCategory(body);
+      case 'sync-consumer':
+        return await handleSyncConsumer(body);
+      case 'manual-sync-consumer':
+        return await handleManualSyncConsumer(body);
       default:
         return NextResponse.json({ 
           success: false, 
@@ -412,14 +508,40 @@ export async function POST(request) {
 
 async function handleGenerateMonthlyTokens() {
   try {
-    if (!diamondContract) {
-      throw new Error('Diamond contract not initialized');
-    }
-
     console.log('🚀 Generating monthly tokens for all consumers...');
     
-    // Use diamondContract instead of tokenOpsContract
-    const tx = await diamondContract.connect(adminWallet).generateMonthlyTokensForAll({
+    // Try diamondContract first, fallback to tokenOpsContract
+    let contractToUse = diamondContract;
+    let contractName = 'diamondContract';
+    
+    if (!diamondContract || !diamondContract.interface || !diamondContract.interface.functions) {
+      console.log('⚠️ Diamond contract not available, using tokenOpsContract fallback');
+      contractToUse = tokenOpsContract;
+      contractName = 'tokenOpsContract';
+    }
+    
+    if (!contractToUse) {
+      throw new Error('No contract available for token generation');
+    }
+
+    console.log(`Using ${contractName} for token generation`);
+    
+    // Check if function exists (only for diamondContract)
+    if (contractName === 'diamondContract') {
+      const hasFunction = 'generateMonthlyTokensForAll' in contractToUse.interface.functions;
+      if (!hasFunction) {
+        console.log('⚠️ Function not found in diamond contract, falling back to tokenOpsContract');
+        contractToUse = tokenOpsContract;
+        contractName = 'tokenOpsContract';
+      }
+    }
+    
+    if (!contractToUse) {
+      throw new Error('generateMonthlyTokensForAll function not available on any contract');
+    }
+    
+    // Execute the transaction
+    const tx = await contractToUse.generateMonthlyTokensForAll({
       gasLimit: 2000000
     });
     
@@ -537,10 +659,6 @@ async function handleGenerateTokenForConsumer(body) {
 
 async function handleGenerateTokensForCategory(body) {
   try {
-    if (!diamondContract) {
-      throw new Error('Diamond contract not initialized');
-    }
-
     const { category } = body;
     
     if (!category) {
@@ -549,8 +667,38 @@ async function handleGenerateTokensForCategory(body) {
 
     console.log(`🚀 Generating tokens for category: ${category}`);
     
-    // Use diamondContract instead of tokenOpsContract
-    const tx = await diamondContract.connect(adminWallet).generateTokensForCategory(category, {
+    // Try diamondContract first, fallback to tokenOpsContract
+    let contractToUse = diamondContract;
+    let contractName = 'diamondContract';
+    
+    if (!diamondContract || !diamondContract.interface || !diamondContract.interface.functions) {
+      console.log('⚠️ Diamond contract not available, using tokenOpsContract fallback');
+      contractToUse = tokenOpsContract;
+      contractName = 'tokenOpsContract';
+    }
+    
+    if (!contractToUse) {
+      throw new Error('No contract available for token generation');
+    }
+
+    console.log(`Using ${contractName} for token generation`);
+    
+    // Check if function exists (only for diamondContract)
+    if (contractName === 'diamondContract') {
+      const hasFunction = 'generateTokensForCategory' in contractToUse.interface.functions;
+      if (!hasFunction) {
+        console.log('⚠️ Function not found in diamond contract, falling back to tokenOpsContract');
+        contractToUse = tokenOpsContract;
+        contractName = 'tokenOpsContract';
+      }
+    }
+    
+    if (!contractToUse) {
+      throw new Error('generateTokensForCategory function not available on any contract');
+    }
+    
+    // Execute the transaction
+    const tx = await contractToUse.generateTokensForCategory(category, {
       gasLimit: 1500000
     });
     
@@ -2115,6 +2263,248 @@ async function handleSystemStatus() {
       success: false,
       error: error.message,
       timestamp: new Date().toISOString()
+    }, { status: 500 });
+  }
+}
+
+async function handleSyncConsumer(body) {
+  try {
+    const { aadhaar } = body;
+    
+    if (!aadhaar) {
+      throw new Error('Aadhaar number is required');
+    }
+
+    console.log(`🔄 Syncing consumer with Aadhaar: ${aadhaar}`);
+    
+    // First check if consumer exists on blockchain using different methods
+    let blockchainConsumer = null;
+    const aadhaarBN = BigInt(aadhaar);
+    
+    try {
+      // Try multiple contract instances and methods
+      if (diamondContract) {
+        console.log('🔍 Trying diamondContract.getConsumerByAadhaar...');
+        try {
+          blockchainConsumer = await diamondContract.getConsumerByAadhaar(aadhaarBN);
+          console.log('✅ Found consumer via diamondContract:', blockchainConsumer);
+        } catch (diamondError) {
+          console.log('⚠️ diamondContract failed:', diamondError.message);
+        }
+      }
+      
+      if (!blockchainConsumer && dashboardContract) {
+        console.log('🔍 Trying dashboardContract.getConsumerByAadhaar...');
+        try {
+          blockchainConsumer = await dashboardContract.getConsumerByAadhaar(aadhaarBN);
+          console.log('✅ Found consumer via dashboardContract:', blockchainConsumer);
+        } catch (dashboardError) {
+          console.log('⚠️ dashboardContract failed:', dashboardError.message);
+        }
+      }
+      
+      // Check if we got valid consumer data
+      if (!blockchainConsumer || !blockchainConsumer.name || blockchainConsumer.aadhaar === BigInt(0)) {
+        // Instead of throwing error, let's create from mockdata if available
+        console.log('🔍 Consumer not found on blockchain, checking mockdata...');
+        
+        // Try to find consumer in mockdata
+        const mockConsumer = await findConsumerInMockdata(aadhaar);
+        if (mockConsumer) {
+          console.log('✅ Found consumer in mockdata:', mockConsumer.name);
+          blockchainConsumer = {
+            name: mockConsumer.name,
+            mobile: mockConsumer.phoneNumber,
+            category: mockConsumer.category,
+            aadhaar: aadhaarBN
+          };
+        } else {
+          throw new Error('Consumer not found on blockchain or in mockdata');
+        }
+      }
+      
+    } catch (blockchainError) {
+      console.error('❌ All blockchain lookup methods failed:', blockchainError);
+      
+      // Final fallback: try to find in mockdata
+      console.log('🔍 Final fallback: checking mockdata...');
+      const mockConsumer = await findConsumerInMockdata(aadhaar);
+      if (mockConsumer) {
+        console.log('✅ Using mockdata for consumer sync');
+        blockchainConsumer = {
+          name: mockConsumer.name,
+          mobile: mockConsumer.phoneNumber,
+          category: mockConsumer.category,
+          aadhaar: aadhaarBN
+        };
+      } else {
+        throw new Error(`No consumer data found anywhere for Aadhaar ${aadhaar}`);
+      }
+    }
+
+    // Check if consumer exists in database
+    await dbConnect();
+    const existingConsumer = await ConsumerSignupRequest.findOne({
+      aadharNumber: aadhaar
+    });
+    
+    if (existingConsumer) {
+      console.log('✅ Consumer already exists in database');
+      return NextResponse.json({
+        success: true,
+        message: 'Consumer already synced',
+        consumer: {
+          id: existingConsumer._id,
+          name: existingConsumer.name,
+          aadhaar: existingConsumer.aadharNumber,
+          status: existingConsumer.status
+        }
+      });
+    }
+    
+    // Create consumer in database from blockchain/mockdata
+    const bcrypt = require('bcryptjs');
+    const defaultPin = '123456'; // Default PIN for synced consumers
+    const hashedPin = await bcrypt.hash(defaultPin, 10);
+    
+    // Extract consumer data
+    const consumerData = {
+      name: blockchainConsumer.name,
+      phone: blockchainConsumer.mobile || '0000000000',
+      homeAddress: 'Village (Synced)',
+      rationCardId: `RC${aadhaar}`,
+      aadharNumber: aadhaar,
+      pin: hashedPin,
+      status: 'approved',
+      approvedAt: new Date(),
+      blockchainTxHash: 'sync-from-data',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    const newConsumer = new ConsumerSignupRequest(consumerData);
+    await newConsumer.save();
+    
+    console.log('✅ Consumer synced successfully to database');
+    
+    return NextResponse.json({
+      success: true,
+      message: 'Consumer synced successfully',
+      consumer: {
+        id: newConsumer._id,
+        name: newConsumer.name,
+        aadhaar: newConsumer.aadharNumber,
+        status: newConsumer.status,
+        defaultPin: defaultPin
+      },
+      instructions: `Consumer can now login with Aadhaar ${aadhaar} and PIN ${defaultPin}`
+    });
+    
+  } catch (error) {
+    console.error('Sync consumer error:', error);
+    return NextResponse.json({
+      success: false,
+      error: `Failed to sync consumer: ${error.message}`
+    }, { status: 500 });
+  }
+}
+
+// Helper function to find consumer in mockdata
+async function findConsumerInMockdata(aadhaar) {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    
+    // Read mockdata.json
+    const mockdataPath = path.join(process.cwd(), 'public', 'mockdata.json');
+    
+    if (!fs.existsSync(mockdataPath)) {
+      console.log('Mockdata file not found');
+      return null;
+    }
+    
+    const mockdata = JSON.parse(fs.readFileSync(mockdataPath, 'utf8'));
+    const consumer = mockdata.find(c => c.aadhaar === aadhaar);
+    
+    return consumer || null;
+  } catch (error) {
+    console.error('Error reading mockdata:', error);
+    return null;
+  }
+}
+
+async function handleManualSyncConsumer(body) {
+  try {
+    const { aadhaar, name, phone, category, village } = body;
+    
+    if (!aadhaar) {
+      throw new Error('Aadhaar number is required');
+    }
+
+    console.log(`🔄 Manual sync for consumer: ${aadhaar}`);
+
+    // Check if consumer exists in database
+    await dbConnect();
+    const existingConsumer = await ConsumerSignupRequest.findOne({
+      aadharNumber: aadhaar
+    });
+    
+    if (existingConsumer) {
+      console.log('✅ Consumer already exists in database');
+      return NextResponse.json({
+        success: true,
+        message: 'Consumer already exists in database',
+        consumer: {
+          id: existingConsumer._id,
+          name: existingConsumer.name,
+          aadhaar: existingConsumer.aadharNumber,
+          status: existingConsumer.status
+        }
+      });
+    }
+    
+    // Create consumer in database with provided or default data
+    const bcrypt = require('bcryptjs');
+    const defaultPin = '123456';
+    const hashedPin = await bcrypt.hash(defaultPin, 10);
+    
+    const consumerData = {
+      name: name || 'Consumer',
+      phone: phone || '0000000000',
+      homeAddress: village || 'Village',
+      rationCardId: `RC${aadhaar}`,
+      aadharNumber: aadhaar,
+      pin: hashedPin,
+      status: 'approved',
+      approvedAt: new Date(),
+      blockchainTxHash: 'manual-entry',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    const newConsumer = new ConsumerSignupRequest(consumerData);
+    await newConsumer.save();
+    
+    console.log('✅ Consumer manually synced to database');
+    
+    return NextResponse.json({
+      success: true,
+      message: 'Consumer manually added to database',
+      consumer: {
+        id: newConsumer._id,
+        name: newConsumer.name,
+        aadhaar: newConsumer.aadharNumber,
+        status: newConsumer.status,
+        defaultPin: defaultPin
+      },
+      instructions: `Consumer can now login with Aadhaar ${aadhaar} and PIN ${defaultPin}`
+    });
+    
+  } catch (error) {
+    console.error('Manual sync error:', error);
+    return NextResponse.json({
+      success: false,
+      error: `Failed to manually sync consumer: ${error.message}`
     }, { status: 500 });
   }
 }

@@ -143,6 +143,14 @@ export default function AdminLayout({ children }) {
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname === "/admin/consumers"}>
+                      <Link href="/admin/consumers">
+                        <Users className="h-4 w-4 text-purple-700" />
+                        <span>Consumer Management</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname === "/admin/register-shopkeeper"}>
                       <Link href="/admin/register-shopkeeper">
                         <Users className="h-4 w-4 text-blue-700" />
